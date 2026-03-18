@@ -220,7 +220,7 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
                         GameConstants.NETWORK_VERSION,
                         launchConfig.connectHost(),
                         launchConfig.port(),
-                        launchConfig.port()
+                        -1
                 );
             } catch (IOException exception) {
                 lastFailure = exception;

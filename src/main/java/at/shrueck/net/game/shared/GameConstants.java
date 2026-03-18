@@ -3,7 +3,7 @@ package at.shrueck.net.game.shared;
 public final class GameConstants {
 
     public static final String NETWORK_GAME_NAME = "shrueck-lan";
-    public static final int NETWORK_VERSION = 1;
+    public static final int NETWORK_VERSION = 2;
     public static final int DEFAULT_PORT = 6143;
 
     public static final float SERVER_TICK_RATE = 20f;

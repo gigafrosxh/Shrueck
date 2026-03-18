@@ -74,7 +74,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 GameConstants.NETWORK_GAME_NAME,
                 GameConstants.NETWORK_VERSION,
                 port,
-                port
+                -1
         );
         server.addConnectionListener(this);
         server.addMessageListener(
