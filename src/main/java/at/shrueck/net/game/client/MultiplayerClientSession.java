@@ -37,13 +37,7 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
     public MultiplayerClientSession(LaunchConfig launchConfig) throws IOException {
         this.launchConfig = launchConfig;
         NetworkProtocol.registerAll();
-        this.client = Network.connectToServer(
-                GameConstants.NETWORK_GAME_NAME,
-                GameConstants.NETWORK_VERSION,
-                launchConfig.connectHost(),
-                launchConfig.port(),
-                launchConfig.port()
-        );
+        this.client = connectWithRetry(launchConfig);
         client.addClientStateListener(this);
         client.addMessageListener(
                 this,
@@ -168,5 +162,42 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
             return CharacterMode.IDLE;
         }
         return modes[modeCode];
+    }
+
+    private static Client connectWithRetry(LaunchConfig launchConfig) throws IOException {
+        IOException lastFailure = null;
+        int attempts = launchConfig.isHost() || launchConfig.isLoopbackConnection() ? 15 : 4;
+        long retryDelayMillis = launchConfig.isHost() || launchConfig.isLoopbackConnection() ? 200L : 350L;
+
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                return Network.connectToServer(
+                        GameConstants.NETWORK_GAME_NAME,
+                        GameConstants.NETWORK_VERSION,
+                        launchConfig.connectHost(),
+                        launchConfig.port(),
+                        launchConfig.port()
+                );
+            } catch (IOException exception) {
+                lastFailure = exception;
+                if (attempt == attempts) {
+                    break;
+                }
+                try {
+                    Thread.sleep(retryDelayMillis);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    IOException aborted = new IOException("Verbindungsaufbau unterbrochen.", interruptedException);
+                    aborted.addSuppressed(exception);
+                    throw aborted;
+                }
+            }
+        }
+
+        String message = "Verbindung zu " + launchConfig.connectHost() + ":" + launchConfig.port() + " fehlgeschlagen.";
+        if (lastFailure != null && lastFailure.getMessage() != null && !lastFailure.getMessage().isBlank()) {
+            message += " " + lastFailure.getMessage();
+        }
+        throw new IOException(message, lastFailure);
     }
 }

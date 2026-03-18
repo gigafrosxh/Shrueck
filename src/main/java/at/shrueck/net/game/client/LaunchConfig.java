@@ -4,6 +4,8 @@ import at.shrueck.net.game.shared.GameConstants;
 
 public record LaunchConfig(LaunchMode mode, String playerName, String host, int port) {
 
+    private static final String LOOPBACK_HOST = "127.0.0.1";
+
     public LaunchConfig {
         mode = mode == null ? LaunchMode.JOIN : mode;
         playerName = sanitizePlayerName(playerName);
@@ -15,12 +17,16 @@ public record LaunchConfig(LaunchMode mode, String playerName, String host, int 
         return mode == LaunchMode.HOST;
     }
 
+    public boolean isLoopbackConnection() {
+        return host.equals(LOOPBACK_HOST);
+    }
+
     public String connectHost() {
-        return isHost() ? "localhost" : host;
+        return host;
     }
 
     public String endpointLabel() {
-        return connectHost() + ":" + port;
+        return host + ":" + port;
     }
 
     public static LaunchConfig fromArgs(String[] args) {
@@ -33,7 +39,7 @@ public record LaunchConfig(LaunchMode mode, String playerName, String host, int 
             case "host" -> {
                 String playerName = args.length >= 2 ? args[1] : defaultPlayerName();
                 int port = args.length >= 3 ? parsePort(args[2]) : GameConstants.DEFAULT_PORT;
-                yield new LaunchConfig(LaunchMode.HOST, playerName, "localhost", port);
+                yield new LaunchConfig(LaunchMode.HOST, playerName, LOOPBACK_HOST, port);
             }
             case "join" -> {
                 if (args.length < 3) {
@@ -74,8 +80,14 @@ public record LaunchConfig(LaunchMode mode, String playerName, String host, int 
     }
 
     private static String sanitizeHost(String value) {
-        String sanitized = value == null ? "localhost" : value.strip();
-        return sanitized.isEmpty() ? "localhost" : sanitized;
+        String sanitized = value == null ? LOOPBACK_HOST : value.strip();
+        if (sanitized.isEmpty()) {
+            return LOOPBACK_HOST;
+        }
+        if (sanitized.equalsIgnoreCase("localhost") || sanitized.equals("::1") || sanitized.equals("[::1]")) {
+            return LOOPBACK_HOST;
+        }
+        return sanitized;
     }
 
     private static int normalizePort(int value) {

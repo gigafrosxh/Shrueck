@@ -95,7 +95,7 @@ public final class LauncherDialog {
         if (port == null) {
             return null;
         }
-        return new LaunchConfig(LaunchConfig.LaunchMode.HOST, playerName, "localhost", port);
+        return new LaunchConfig(LaunchConfig.LaunchMode.HOST, playerName, "127.0.0.1", port);
     }
 
     private static LaunchConfig createMacJoinConfig() throws IOException, InterruptedException {
@@ -169,7 +169,7 @@ public final class LauncherDialog {
         if (port == null) {
             return null;
         }
-        return new LaunchConfig(LaunchConfig.LaunchMode.HOST, playerName, "localhost", port);
+        return new LaunchConfig(LaunchConfig.LaunchMode.HOST, playerName, "127.0.0.1", port);
     }
 
     private static LaunchConfig createJoinConfig() {
