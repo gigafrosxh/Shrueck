@@ -25,6 +25,7 @@ import com.jme3.network.Network;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class MultiplayerClientSession implements MessageListener<Client>, ClientStateListener, AutoCloseable {
@@ -100,7 +101,9 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
 
     @Override
     public void clientDisconnected(Client source, DisconnectInfo info) {
-        latestState.set(ClientGameState.disconnected("Verbindung zum Server beendet."));
+        String reason = formatDisconnectReason(info);
+        pendingNotice.set(reason);
+        latestState.set(ClientGameState.disconnected(reason));
     }
 
     @Override
@@ -172,6 +175,37 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
             return CharacterMode.IDLE;
         }
         return modes[modeCode];
+    }
+
+    private String formatDisconnectReason(DisconnectInfo info) {
+        StringBuilder builder = new StringBuilder("Verbindung zum Server beendet.");
+        String detail = null;
+
+        if (info != null) {
+            if (info.reason != null && !info.reason.isBlank()) {
+                detail = info.reason.strip();
+            } else if (info.error != null && info.error.getMessage() != null && !info.error.getMessage().isBlank()) {
+                detail = info.error.getMessage().strip();
+            } else if (info.error != null) {
+                detail = info.error.getClass().getSimpleName();
+            }
+        }
+
+        if (detail != null && !detail.isBlank()) {
+            builder.append(' ').append(detail);
+        }
+
+        String normalized = detail == null ? "" : detail.toLowerCase(Locale.ROOT);
+        if (normalized.contains("serializer")
+                || normalized.contains("version")
+                || normalized.contains("registry")
+                || normalized.contains("stream")
+                || normalized.contains("reset")
+                || normalized.contains("refused")) {
+            builder.append(" Host und Client muessen dieselbe Build-Version verwenden.");
+        }
+
+        return builder.toString();
     }
 
     private static Client connectWithRetry(LaunchConfig launchConfig) throws IOException {
