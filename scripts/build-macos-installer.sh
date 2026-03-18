@@ -32,8 +32,8 @@ jpackage \
   --description "Shrueck LAN Multiplayer" \
   --main-jar "$(basename "$main_jar")" \
   --main-class at.shrueck.net.game.ShrueckGameLauncher \
-  --java-options -XstartOnFirstThread \
-  --java-options=-Dfile.encoding=UTF-8
+  --java-options "-XstartOnFirstThread" \
+  --java-options "-Dfile.encoding=UTF-8"
 
 artifact="$(find "$dist_dir" -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
 if [[ -z "$artifact" ]]; then

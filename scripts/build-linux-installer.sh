@@ -32,7 +32,7 @@ jpackage \
   --description "Shrueck LAN Multiplayer" \
   --main-jar "$(basename "$main_jar")" \
   --main-class at.shrueck.net.game.ShrueckGameLauncher \
-  --java-options=-Dfile.encoding=UTF-8 \
+  --java-options "-Dfile.encoding=UTF-8" \
   --linux-package-name "shrueck-lan" \
   --linux-deb-maintainer "build@shrueck.local" \
   --linux-menu-group "Games" \
