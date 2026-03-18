@@ -1,0 +1,78 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2025
+            java-arch: x64
+            package-type: exe
+          - platform: windows-arm64
+            runner: windows-11-arm
+            java-arch: aarch64
+            package-type: exe
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            java-arch: x64
+            package-type: deb
+          - platform: macos-arm64
+            runner: macos-14
+            java-arch: aarch64
+            package-type: dmg
+          - platform: macos-x64
+            runner: macos-15-intel
+            java-arch: x64
+            package-type: dmg
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          architecture: ${{ matrix.java-arch }}
+          cache: maven
+
+      - name: Install Linux packaging prerequisites
+        if: startsWith(matrix.platform, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: Make shell scripts executable
+        if: startsWith(matrix.platform, 'linux') || startsWith(matrix.platform, 'macos')
+        run: chmod +x scripts/*.sh
+
+      - name: Build Windows installer
+        if: startsWith(matrix.platform, 'windows')
+        shell: pwsh
+        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.package-type }}'
+
+      - name: Build Linux installer
+        if: startsWith(matrix.platform, 'linux')
+        run: ./scripts/build-linux-installer.sh '${{ matrix.platform }}'
+
+      - name: Build macOS installer
+        if: startsWith(matrix.platform, 'macos')
+        run: ./scripts/build-macos-installer.sh '${{ matrix.platform }}'
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/${{ matrix.platform }}/*
+          if-no-files-found: error

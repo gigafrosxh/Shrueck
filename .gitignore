@@ -37,11 +37,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
-/.github/
-/.github/workflows/
-/.github/workflows/build-installers.yml
 /.idea/
 /.mvn/
 /.tools/
 /dist/
-/scripts/
