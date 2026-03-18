@@ -1,7 +1,7 @@
 param(
     [string]$PlatformTag = "windows-x64",
     [string]$PackageType = "exe",
-    [string]$AppVersion = "1.0.0"
+    [string]$AppVersion = "1.2.0-SNAPSHOT"
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,6 +10,7 @@ $toolsDir = Join-Path $projectRoot ".tools"
 $mavenVersion = "3.9.10"
 $mavenHome = Join-Path $toolsDir ("apache-maven-" + $mavenVersion)
 $localMaven = Join-Path $mavenHome "bin\mvn.cmd"
+$localRepo = Join-Path $projectRoot ".m2\repository"
 $inputDir = Join-Path $projectRoot "target\jpackage\input"
 $distDir = Join-Path $projectRoot ("dist\" + $PlatformTag)
 $wixDir = Join-Path $toolsDir "wix314"
@@ -65,12 +66,27 @@ function Resolve-WixToolset {
     return $wixBin
 }
 
+function Get-PackageVersion([string]$version) {
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        throw "AppVersion darf nicht leer sein."
+    }
+
+    $match = [System.Text.RegularExpressions.Regex]::Match($version, '^\d+(?:\.\d+){0,3}')
+    if (-not $match.Success) {
+        throw "AppVersion '$version' enthaelt keinen gueltigen numerischen Versionsprefix fuer jpackage."
+    }
+
+    return $match.Value
+}
+
 if (-not (Get-Command jpackage -ErrorAction SilentlyContinue)) {
     throw "jpackage ist nicht verfuegbar. Bitte ein JDK 21+ mit jpackage verwenden."
 }
 
 $mavenCommand = Resolve-MavenCommand
 $null = Resolve-WixToolset
+$packageVersion = Get-PackageVersion $AppVersion
+New-Item -ItemType Directory -Path $localRepo -Force | Out-Null
 
 Push-Location $projectRoot
 try {
@@ -79,7 +95,7 @@ try {
     New-Item -ItemType Directory -Path $inputDir -Force | Out-Null
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 
-    & $mavenCommand -q -DskipTests package dependency:copy-dependencies -DincludeScope=runtime ("-DoutputDirectory=" + $inputDir)
+    & $mavenCommand -q ("-Dmaven.repo.local=" + $localRepo) -DskipTests package dependency:copy-dependencies -DincludeScope=runtime ("-DoutputDirectory=" + $inputDir)
 
     $mainJar = Get-MainJar
     Copy-Item $mainJar.FullName -Destination $inputDir -Force
@@ -89,7 +105,7 @@ try {
         '--dest', $distDir,
         '--input', $inputDir,
         '--name', 'ShrueckLAN',
-        '--app-version', $AppVersion,
+        '--app-version', $packageVersion,
         '--vendor', 'Shrueck',
         '--description', 'Shrueck LAN Multiplayer',
         '--main-jar', $mainJar.Name,

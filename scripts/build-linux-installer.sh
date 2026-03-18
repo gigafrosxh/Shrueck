@@ -2,17 +2,24 @@
 set -euo pipefail
 
 platform_tag="${1:-linux-x64}"
-app_version="${APP_VERSION:-1.0.0}"
+app_version="${APP_VERSION:-1.2.0-SNAPSHOT}"
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
+local_repo="$project_root/.m2/repository"
 input_dir="$project_root/target/jpackage/input"
 dist_dir="$project_root/dist/$platform_tag"
 maven_cmd="$($project_root/scripts/resolve-maven.sh)"
+package_version="$(printf '%s' "$app_version" | sed -E 's/^([0-9]+(\.[0-9]+){0,3}).*/\1/')"
+
+if [[ -z "$package_version" || ! "$package_version" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+    echo "APP_VERSION '$app_version' enthaelt keinen gueltigen numerischen Versionsprefix fuer jpackage." >&2
+    exit 1
+fi
 
 rm -rf "$input_dir" "$dist_dir"
-mkdir -p "$input_dir" "$dist_dir"
+mkdir -p "$input_dir" "$dist_dir" "$local_repo"
 
 cd "$project_root"
-"$maven_cmd" -q -DskipTests package dependency:copy-dependencies -DincludeScope=runtime "-DoutputDirectory=$input_dir"
+"$maven_cmd" -q "-Dmaven.repo.local=$local_repo" -DskipTests package dependency:copy-dependencies -DincludeScope=runtime "-DoutputDirectory=$input_dir"
 
 main_jar="$(find "$project_root/target" -maxdepth 1 -type f -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | head -n 1)"
 if [[ -z "$main_jar" ]]; then
@@ -27,7 +34,7 @@ jpackage \
   --dest "$dist_dir" \
   --input "$input_dir" \
   --name "shrueck-lan" \
-  --app-version "$app_version" \
+  --app-version "$package_version" \
   --vendor "Shrueck" \
   --description "Shrueck LAN Multiplayer" \
   --main-jar "$(basename "$main_jar")" \

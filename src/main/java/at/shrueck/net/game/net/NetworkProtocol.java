@@ -20,6 +20,7 @@ public final class NetworkProtocol {
         Serializer.registerClass(JoinAcceptedMessage.class);
         Serializer.registerClass(JoinRejectedMessage.class);
         Serializer.registerClass(PlayerInputMessage.class);
+        Serializer.registerClass(UpdateSkinSelectionMessage.class);
         Serializer.registerClass(StartRoundRequestMessage.class);
         Serializer.registerClass(ServerNoticeMessage.class);
         Serializer.registerClass(StateSyncMessage.class);
@@ -91,6 +92,19 @@ public final class NetworkProtocol {
     }
 
     @Serializable
+    public static class UpdateSkinSelectionMessage extends AbstractMessage {
+
+        public int skinCode;
+
+        public UpdateSkinSelectionMessage() {
+        }
+
+        public UpdateSkinSelectionMessage(int skinCode) {
+            this.skinCode = skinCode;
+        }
+    }
+
+    @Serializable
     public static class StartRoundRequestMessage extends AbstractMessage {
 
         public StartRoundRequestMessage() {
@@ -155,6 +169,7 @@ public final class NetworkProtocol {
         public float z;
         public float yaw;
         public int modeCode;
+        public int skinCode;
 
         public PlayerStateSnapshot() {
         }
@@ -168,7 +183,8 @@ public final class NetworkProtocol {
                 float x,
                 float z,
                 float yaw,
-                int modeCode
+                int modeCode,
+                int skinCode
         ) {
             this.playerId = playerId;
             this.playerName = playerName;
@@ -179,6 +195,7 @@ public final class NetworkProtocol {
             this.z = z;
             this.yaw = yaw;
             this.modeCode = modeCode;
+            this.skinCode = skinCode;
         }
     }
 }

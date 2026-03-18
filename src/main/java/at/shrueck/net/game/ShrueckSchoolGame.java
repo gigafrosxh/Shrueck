@@ -9,6 +9,7 @@ import at.shrueck.net.game.server.LanGameServer;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.PlayerInputState;
 import at.shrueck.net.game.shared.SessionPhase;
+import at.shrueck.net.game.shared.StudentSkin;
 import at.shrueck.net.game.ui.HudController;
 import at.shrueck.net.game.world.SchoolLayout;
 import at.shrueck.net.game.world.SchoolSceneBuilder;
@@ -50,6 +51,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     private static final String CAMERA_CAPTURE = "camera.capture";
     private static final String CAMERA_RELEASE = "camera.release";
     private static final String LOBBY_START = "lobby.start";
+    private static final String PLAYER_CYCLE_SKIN = "player.skin.cycle";
 
     private final LaunchConfig launchConfig;
     private final MultiplayerClientSession clientSession;
@@ -67,6 +69,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     private float cameraPitch = CAMERA_DEFAULT_PITCH;
     private float inputSendAccumulator;
     private PlayerInputState lastSentInput = PlayerInputState.idle(0f);
+    private StudentSkin localStudentSkin = StudentSkin.FJP;
 
     public ShrueckSchoolGame(LaunchConfig launchConfig, MultiplayerClientSession clientSession, LanGameServer hostedServer) {
         this.launchConfig = launchConfig;
@@ -177,6 +180,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
                     hudController.pushNotice("Nur der Host kann starten.");
                 }
             }
+            case PLAYER_CYCLE_SKIN -> cycleLocalStudentSkin();
             default -> {
             }
         }
@@ -187,6 +191,11 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
         for (ClientGameState.ClientPlayerState player : state.players()) {
             activeIds.add(player.playerId());
             NetworkPlayerView view = playerViews.computeIfAbsent(player.playerId(), this::createPlayerView);
+            if (player.playerId() == clientSession.playerId()) {
+                view.setStudentSkin(localStudentSkin);
+            } else {
+                view.setStudentSkin(player.studentSkin());
+            }
             view.apply(player);
         }
 
@@ -202,8 +211,21 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
     private NetworkPlayerView createPlayerView(int playerId) {
         NetworkPlayerView view = new NetworkPlayerView("network-player-" + playerId, assetManager, playerId);
+        if (playerId == clientSession.playerId()) {
+            view.setStudentSkin(localStudentSkin);
+        }
         rootNode.attachChild(view);
         return view;
+    }
+
+    private void cycleLocalStudentSkin() {
+        localStudentSkin = localStudentSkin.next();
+        clientSession.sendSkinSelection(localStudentSkin);
+        NetworkPlayerView localView = playerViews.get(clientSession.playerId());
+        if (localView != null) {
+            localView.setStudentSkin(localStudentSkin);
+        }
+        hudController.pushNotice("Spieler-Skin: " + localStudentSkin.label());
     }
 
     private void sendLocalInput(float tpf) {
@@ -250,7 +272,8 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
     private void registerGameActions() {
         inputManager.addMapping(LOBBY_START, new KeyTrigger(KeyInput.KEY_RETURN), new KeyTrigger(KeyInput.KEY_NUMPADENTER));
-        inputManager.addListener(this, LOBBY_START);
+        inputManager.addMapping(PLAYER_CYCLE_SKIN, new KeyTrigger(KeyInput.KEY_F6));
+        inputManager.addListener(this, LOBBY_START, PLAYER_CYCLE_SKIN);
     }
 
     private void captureMouse() {

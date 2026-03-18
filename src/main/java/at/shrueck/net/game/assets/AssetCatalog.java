@@ -3,6 +3,7 @@ package at.shrueck.net.game.assets;
 import at.shrueck.net.game.character.AnimatedActor;
 import at.shrueck.net.game.character.CharacterMode;
 import at.shrueck.net.game.shared.AvatarRole;
+import at.shrueck.net.game.shared.StudentSkin;
 import com.jme3.asset.AssetManager;
 import java.util.EnumMap;
 
@@ -18,7 +19,7 @@ public final class AssetCatalog {
     }
 
     public static AnimatedActor createAvatar(AssetManager assetManager, AvatarRole role) {
-        return role == AvatarRole.SHRUECK ? createShrueck(assetManager) : createStudent(assetManager, true);
+        return role == AvatarRole.SHRUECK ? createShrueck(assetManager) : createStudent(assetManager, StudentSkin.FJP);
     }
 
     public static AnimatedActor createShrueck(AssetManager assetManager) {
@@ -63,37 +64,72 @@ public final class AssetCatalog {
     }
 
     public static AnimatedActor createStudent(AssetManager assetManager, boolean specialIdle) {
+        return createStudent(assetManager, StudentSkin.FJP, specialIdle);
+    }
+
+    public static AnimatedActor createStudent(AssetManager assetManager, StudentSkin studentSkin) {
+        return createStudent(assetManager, studentSkin, true);
+    }
+
+    private static AnimatedActor createStudent(AssetManager assetManager, StudentSkin studentSkin, boolean specialIdle) {
         EnumMap<CharacterMode, AnimationVariant> variants = new EnumMap<>(CharacterMode.class);
-        variants.put(
-                CharacterMode.MOVE,
-                new AnimationVariant(
-                        "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Walking_withSkin.glb",
-                        "Armature|walking_man|baselayer",
-                        STUDENT_SCALE,
-                        0f
-                )
-        );
-        variants.put(
-                CharacterMode.FAST,
-                new AnimationVariant(
-                        "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Running_withSkin.glb",
-                        "Armature|running|baselayer",
-                        STUDENT_SCALE,
-                        0f
-                )
-        );
+        variants.put(CharacterMode.MOVE, walkingVariant(studentSkin));
+        variants.put(CharacterMode.FAST, runningVariant(studentSkin));
         if (specialIdle) {
-            variants.put(
-                    CharacterMode.SPECIAL,
-                    new AnimationVariant(
-                            "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Crystal_Beads_withSkin.glb",
-                            "Armature|Crystal_Beads|baselayer",
-                            STUDENT_SCALE,
-                            0f
-                    )
-            );
+            variants.put(CharacterMode.SPECIAL, specialVariant(studentSkin));
         }
         return new AnimatedActor("student", assetManager, variants, CharacterMode.MOVE);
+    }
+
+    private static AnimationVariant walkingVariant(StudentSkin studentSkin) {
+        return switch (studentSkin) {
+            case FJP -> new AnimationVariant(
+                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Walking_withSkin.glb",
+                    "Armature|walking_man|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+            case CH -> new AnimationVariant(
+                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Walking_withSkin.glb",
+                    "Armature|walking_man|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+        };
+    }
+
+    private static AnimationVariant runningVariant(StudentSkin studentSkin) {
+        return switch (studentSkin) {
+            case FJP -> new AnimationVariant(
+                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Running_withSkin.glb",
+                    "Armature|running|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+            case CH -> new AnimationVariant(
+                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Running_withSkin.glb",
+                    "Armature|running|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+        };
+    }
+
+    private static AnimationVariant specialVariant(StudentSkin studentSkin) {
+        return switch (studentSkin) {
+            case FJP -> new AnimationVariant(
+                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Crystal_Beads_withSkin.glb",
+                    "Armature|Crystal_Beads|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+            case CH -> new AnimationVariant(
+                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Boom_Dance_withSkin.glb",
+                    "Armature|Boom_Dance|baselayer",
+                    STUDENT_SCALE,
+                    0f
+            );
+        };
     }
 
     public record AnimationVariant(String assetPath, String clipName, float uniformScale, float baseYaw) {

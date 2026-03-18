@@ -10,11 +10,13 @@ import at.shrueck.net.game.net.NetworkProtocol.PlayerStateSnapshot;
 import at.shrueck.net.game.net.NetworkProtocol.ServerNoticeMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StartRoundRequestMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StateSyncMessage;
+import at.shrueck.net.game.net.NetworkProtocol.UpdateSkinSelectionMessage;
 import at.shrueck.net.game.shared.AvatarRole;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.PlayerInputState;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
+import at.shrueck.net.game.shared.StudentSkin;
 import com.jme3.network.Client;
 import com.jme3.network.ClientStateListener;
 import com.jme3.network.Message;
@@ -78,6 +80,13 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
         ));
     }
 
+    public void sendSkinSelection(StudentSkin studentSkin) {
+        if (studentSkin == null || !client.isConnected()) {
+            return;
+        }
+        client.send(new UpdateSkinSelectionMessage(studentSkin.code()));
+    }
+
     public void requestRoundStart() {
         if (client.isConnected()) {
             client.send(new StartRoundRequestMessage());
@@ -139,7 +148,8 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
                         player.x,
                         player.z,
                         player.yaw,
-                        decodeMode(player.modeCode)
+                        decodeMode(player.modeCode),
+                        StudentSkin.fromCode(player.skinCode)
                 ));
             }
         }

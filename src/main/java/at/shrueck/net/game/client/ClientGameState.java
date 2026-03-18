@@ -4,6 +4,7 @@ import at.shrueck.net.game.character.CharacterMode;
 import at.shrueck.net.game.shared.AvatarRole;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
+import at.shrueck.net.game.shared.StudentSkin;
 import java.util.List;
 
 public record ClientGameState(
@@ -49,7 +50,8 @@ public record ClientGameState(
             float x,
             float z,
             float yaw,
-            CharacterMode mode
+            CharacterMode mode,
+            StudentSkin studentSkin
     ) {
     }
 }

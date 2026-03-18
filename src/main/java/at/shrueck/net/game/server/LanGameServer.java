@@ -10,22 +10,24 @@ import at.shrueck.net.game.net.NetworkProtocol.PlayerStateSnapshot;
 import at.shrueck.net.game.net.NetworkProtocol.ServerNoticeMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StartRoundRequestMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StateSyncMessage;
+import at.shrueck.net.game.net.NetworkProtocol.UpdateSkinSelectionMessage;
 import at.shrueck.net.game.shared.AvatarRole;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.MovementMath;
 import at.shrueck.net.game.shared.PlayerInputState;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
+import at.shrueck.net.game.shared.StudentSkin;
 import at.shrueck.net.game.world.SchoolLayout;
 import at.shrueck.net.game.world.SchoolWorldFactory;
 import com.jme3.math.FastMath;
 import com.jme3.math.Vector3f;
+import com.jme3.network.ConnectionListener;
 import com.jme3.network.HostedConnection;
 import com.jme3.network.Message;
 import com.jme3.network.MessageListener;
 import com.jme3.network.Network;
 import com.jme3.network.Server;
-import com.jme3.network.ConnectionListener;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -79,6 +81,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 this,
                 JoinLobbyRequestMessage.class,
                 PlayerInputMessage.class,
+                UpdateSkinSelectionMessage.class,
                 StartRoundRequestMessage.class
         );
         server.start();
@@ -158,6 +161,11 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
             return;
         }
 
+        if (message instanceof UpdateSkinSelectionMessage updateSkinSelectionMessage) {
+            handleSkinSelection(source, updateSkinSelectionMessage);
+            return;
+        }
+
         if (message instanceof StartRoundRequestMessage) {
             handleStartRequest(source);
         }
@@ -202,6 +210,19 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 message.sprint,
                 message.cameraYaw
         );
+    }
+
+    private void handleSkinSelection(HostedConnection source, UpdateSkinSelectionMessage message) {
+        ServerPlayer player = players.get(source.getId());
+        if (player == null) {
+            return;
+        }
+
+        StudentSkin requestedSkin = StudentSkin.fromCode(message.skinCode);
+        if (player.studentSkin != requestedSkin) {
+            player.studentSkin = requestedSkin;
+            snapshotDirty = true;
+        }
     }
 
     private void handleStartRequest(HostedConnection source) {
@@ -426,7 +447,8 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 player.position.x,
                 player.position.z,
                 player.yaw,
-                player.mode.ordinal()
+                player.mode.ordinal(),
+                player.studentSkin.code()
         );
     }
 
@@ -471,6 +493,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         private final Vector3f position = new Vector3f();
 
         private AvatarRole role = AvatarRole.UNASSIGNED;
+        private StudentSkin studentSkin = StudentSkin.FJP;
         private boolean captured;
         private float yaw;
         private CharacterMode mode = CharacterMode.SPECIAL;

@@ -3,6 +3,7 @@ package at.shrueck.net.game.client;
 import at.shrueck.net.game.assets.AssetCatalog;
 import at.shrueck.net.game.character.AnimatedActor;
 import at.shrueck.net.game.shared.AvatarRole;
+import at.shrueck.net.game.shared.StudentSkin;
 import com.jme3.asset.AssetManager;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
@@ -12,12 +13,13 @@ import com.jme3.scene.Node;
 public final class NetworkPlayerView extends Node {
 
     private final AssetManager assetManager;
-    private final int visualSeed;
     private final Vector3f targetPosition = new Vector3f();
     private final Vector3f smoothedPosition = new Vector3f();
 
     private AnimatedActor actor;
     private AvatarRole activeRole = AvatarRole.UNASSIGNED;
+    private StudentSkin selectedStudentSkin = StudentSkin.FJP;
+    private StudentSkin activeStudentSkin = StudentSkin.FJP;
     private float targetYaw;
     private float displayedYaw;
     private boolean initialized;
@@ -25,10 +27,20 @@ public final class NetworkPlayerView extends Node {
     public NetworkPlayerView(String name, AssetManager assetManager, int visualSeed) {
         super(name);
         this.assetManager = assetManager;
-        this.visualSeed = visualSeed;
+    }
+
+    public void setStudentSkin(StudentSkin studentSkin) {
+        if (studentSkin == null || selectedStudentSkin == studentSkin) {
+            return;
+        }
+        selectedStudentSkin = studentSkin;
+        if (activeRole != AvatarRole.SHRUECK) {
+            ensureActor(activeRole);
+        }
     }
 
     public void apply(ClientGameState.ClientPlayerState state) {
+        setStudentSkin(state.studentSkin());
         ensureActor(state.role());
         targetPosition.set(state.x(), 0f, state.z());
         targetYaw = state.yaw();
@@ -56,7 +68,9 @@ public final class NetworkPlayerView extends Node {
 
     private void ensureActor(AvatarRole role) {
         AvatarRole resolvedRole = role == null ? AvatarRole.UNASSIGNED : role;
-        if (actor != null && resolvedRole == activeRole) {
+        boolean sameRole = resolvedRole == activeRole;
+        boolean sameStudentSkin = resolvedRole == AvatarRole.SHRUECK || activeStudentSkin == selectedStudentSkin;
+        if (actor != null && sameRole && sameStudentSkin) {
             return;
         }
 
@@ -64,9 +78,12 @@ public final class NetworkPlayerView extends Node {
             detachChild(actor);
         }
 
-        actor = resolvedRole == AvatarRole.SHRUECK
-                ? AssetCatalog.createShrueck(assetManager)
-                : AssetCatalog.createStudent(assetManager, true);
+        if (resolvedRole == AvatarRole.SHRUECK) {
+            actor = AssetCatalog.createShrueck(assetManager);
+        } else {
+            actor = AssetCatalog.createStudent(assetManager, selectedStudentSkin);
+            activeStudentSkin = selectedStudentSkin;
+        }
         actor.setLocalTranslation(Vector3f.ZERO);
         attachChild(actor);
         activeRole = resolvedRole;

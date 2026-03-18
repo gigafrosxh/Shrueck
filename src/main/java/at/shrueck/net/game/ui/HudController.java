@@ -139,23 +139,28 @@ public final class HudController {
             boolean mouseCaptured
     ) {
         String mouseHint = mouseCaptured ? "Esc loest Maus" : "Linksklick captured Maus";
+        String skinHint = "F6 wechselt Skin";
 
         return switch (state.phase()) {
             case CONNECTING -> "Verbinde mit dem Server...";
             case LOBBY -> state.hostId() == (localPlayer == null ? -1 : localPlayer.playerId())
-                    ? "Enter startet die Runde | Maus dreht | " + mouseHint
-                    : "Warte auf den Host | Maus dreht | " + mouseHint;
-            case RUNNING -> buildRunningInstructions(localPlayer, mouseHint);
-            case RESULT -> "Naechste Lobby in wenigen Sekunden | Maus dreht | " + mouseHint;
+                    ? "Enter startet die Runde | " + skinHint + " | Maus dreht | " + mouseHint
+                    : "Warte auf den Host | " + skinHint + " | Maus dreht | " + mouseHint;
+            case RUNNING -> buildRunningInstructions(localPlayer, mouseHint, skinHint);
+            case RESULT -> "Naechste Lobby in wenigen Sekunden | " + skinHint + " | Maus dreht | " + mouseHint;
             case DISCONNECTED -> localHostProcess
                     ? "Starte das Spiel neu, um wieder eine Lobby zu hosten."
                     : "Starte den Client neu, um erneut beizutreten.";
         };
     }
 
-    private String buildRunningInstructions(ClientGameState.ClientPlayerState localPlayer, String mouseHint) {
+    private String buildRunningInstructions(
+            ClientGameState.ClientPlayerState localPlayer,
+            String mouseHint,
+            String skinHint
+    ) {
         if (localPlayer == null) {
-            return "WASD/Pfeile bewegen | Shift sprintet | " + mouseHint;
+            return "WASD/Pfeile bewegen | Shift sprintet | " + skinHint + " | " + mouseHint;
         }
         if (localPlayer.role() == AvatarRole.SHRUECK) {
             return "WASD/Pfeile bewegen | Shift sprintet | Fange alle Schueler | " + mouseHint;
@@ -163,7 +168,7 @@ public final class HudController {
         if (localPlayer.captured()) {
             return "Du wurdest gefangen. Beobachte den Rest der Runde | " + mouseHint;
         }
-        return "WASD/Pfeile bewegen | Shift sprintet | Ueberlebe bis der Timer endet | " + mouseHint;
+        return "WASD/Pfeile bewegen | Shift sprintet | " + skinHint + " | Ueberlebe bis der Timer endet | " + mouseHint;
     }
 
     private String buildBannerText(ClientGameState state, ClientGameState.ClientPlayerState localPlayer) {
