@@ -6,7 +6,6 @@ import at.shrueck.net.game.client.MultiplayerClientSession;
 import at.shrueck.net.game.net.NetworkProtocol;
 import at.shrueck.net.game.server.LanGameServer;
 import com.jme3.system.AppSettings;
-import javax.swing.JOptionPane;
 
 public final class ShrueckGameLauncher {
 
@@ -18,7 +17,7 @@ public final class ShrueckGameLauncher {
         try {
             launchConfig = args.length == 0 ? LauncherDialog.chooseLaunchConfig() : LaunchConfig.fromArgs(args);
         } catch (IllegalArgumentException exception) {
-            showStartupError(exception.getMessage());
+            LauncherDialog.showStartupError(exception.getMessage());
             return;
         }
 
@@ -57,15 +56,7 @@ public final class ShrueckGameLauncher {
                 hostedServer.close();
             }
             exception.printStackTrace();
-            showStartupError("Start fehlgeschlagen: " + exception.getMessage());
-        }
-    }
-
-    private static void showStartupError(String message) {
-        try {
-            JOptionPane.showMessageDialog(null, message, "Shrueck LAN", JOptionPane.ERROR_MESSAGE);
-        } catch (Exception ignored) {
-            System.err.println(message);
+            LauncherDialog.showStartupError("Start fehlgeschlagen: " + exception.getMessage());
         }
     }
 }
