@@ -1,5 +1,8 @@
 name: Build Installers
 
+env:
+  RELEASE_APP_VERSION: '26.0.0 Release'
+
 on:
   workflow_call:
     inputs:
@@ -89,10 +92,11 @@ jobs:
                 display: 'macOS Intel (.dmg)'
               }
             };
+            const commonReleaseTargets = ['windows-x64', 'linux-x64', 'macos-arm64'];
 
             const aliases = {
-              all: ['windows-x64', 'linux-x64', 'macos-arm64'],
-              release: Object.keys(catalog),
+              all: commonReleaseTargets,
+              release: commonReleaseTargets,
               windows: ['windows-x64'],
               'windows-x64': ['windows-x64'],
               'windows-arm64': ['windows-arm64'],
@@ -125,6 +129,8 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.display }}
+    env:
+      APP_VERSION: ${{ env.RELEASE_APP_VERSION }}
 
     steps:
       - name: Checkout
@@ -151,7 +157,7 @@ jobs:
       - name: Build Windows installer
         if: startsWith(matrix.platform, 'windows')
         shell: pwsh
-        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.packageType }}'
+        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.packageType }}' -AppVersion '${{ env.RELEASE_APP_VERSION }}'
 
       - name: Build Linux installer
         if: startsWith(matrix.platform, 'linux')

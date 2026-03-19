@@ -14,6 +14,8 @@ public final class AssetCatalog {
     private static final float SHRUECK_FAST_SCALE = 3.08f;
     private static final float SHRUECK_SPECIAL_SCALE = 2.80f;
     private static final float STUDENT_SCALE = 2.44f;
+    private static final String STUDENT_WALKING_CLIP = "Armature|walking_man|baselayer";
+    private static final String STUDENT_RUNNING_CLIP = "Armature|running|baselayer";
 
     private AssetCatalog() {
     }
@@ -82,54 +84,30 @@ public final class AssetCatalog {
     }
 
     private static AnimationVariant walkingVariant(StudentSkin studentSkin) {
-        return switch (studentSkin) {
-            case FJP -> new AnimationVariant(
-                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Walking_withSkin.glb",
-                    "Armature|walking_man|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-            case CH -> new AnimationVariant(
-                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Walking_withSkin.glb",
-                    "Armature|walking_man|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-        };
+        return new AnimationVariant(
+                studentSkin.walkingAssetPath(),
+                STUDENT_WALKING_CLIP,
+                STUDENT_SCALE,
+                0f
+        );
     }
 
     private static AnimationVariant runningVariant(StudentSkin studentSkin) {
-        return switch (studentSkin) {
-            case FJP -> new AnimationVariant(
-                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Running_withSkin.glb",
-                    "Armature|running|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-            case CH -> new AnimationVariant(
-                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Running_withSkin.glb",
-                    "Armature|running|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-        };
+        return new AnimationVariant(
+                studentSkin.runningAssetPath(),
+                STUDENT_RUNNING_CLIP,
+                STUDENT_SCALE,
+                0f
+        );
     }
 
     private static AnimationVariant specialVariant(StudentSkin studentSkin) {
-        return switch (studentSkin) {
-            case FJP -> new AnimationVariant(
-                    "assets/player/fjp/Meshy_AI_Tabletop_T_Pose_biped_Animation_Crystal_Beads_withSkin.glb",
-                    "Armature|Crystal_Beads|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-            case CH -> new AnimationVariant(
-                    "assets/player/ch/Meshy_AI_Open_Arms_Pose_biped_Animation_Boom_Dance_withSkin.glb",
-                    "Armature|Boom_Dance|baselayer",
-                    STUDENT_SCALE,
-                    0f
-            );
-        };
+        return new AnimationVariant(
+                studentSkin.specialAssetPath(),
+                studentSkin.specialClipName(),
+                STUDENT_SCALE,
+                0f
+        );
     }
 
     public record AnimationVariant(String assetPath, String clipName, float uniformScale, float baseYaw) {
