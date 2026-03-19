@@ -1,7 +1,7 @@
 name: Build Installers
 
 env:
-  RELEASE_APP_VERSION: '26.0.0 Release'
+  APP_VERSION: '26.0.0 Release'
 
 on:
   workflow_call:
@@ -129,8 +129,6 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.display }}
-    env:
-      APP_VERSION: ${{ env.RELEASE_APP_VERSION }}
 
     steps:
       - name: Checkout
@@ -157,7 +155,7 @@ jobs:
       - name: Build Windows installer
         if: startsWith(matrix.platform, 'windows')
         shell: pwsh
-        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.packageType }}' -AppVersion '${{ env.RELEASE_APP_VERSION }}'
+        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.packageType }}' -AppVersion "$env:APP_VERSION"
 
       - name: Build Linux installer
         if: startsWith(matrix.platform, 'linux')
