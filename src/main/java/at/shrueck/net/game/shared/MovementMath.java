@@ -10,11 +10,15 @@ public final class MovementMath {
     }
 
     public static Vector3f resolveMoveDelta(PlayerInputState input, AvatarRole role, float tpf) {
+        return resolveMoveDelta(input, role, tpf, 1f);
+    }
+
+    public static Vector3f resolveMoveDelta(PlayerInputState input, AvatarRole role, float tpf, float speedMultiplier) {
         Vector3f direction = resolveDirection(input);
         if (direction.lengthSquared() <= FastMath.ZERO_TOLERANCE) {
             return Vector3f.ZERO.clone();
         }
-        float speed = speedFor(role, input.sprint());
+        float speed = speedFor(role, input.sprint(), speedMultiplier);
         return direction.mult(speed * tpf);
     }
 
@@ -49,10 +53,14 @@ public final class MovementMath {
     }
 
     public static float speedFor(AvatarRole role, boolean sprint) {
+        return speedFor(role, sprint, 1f);
+    }
+
+    public static float speedFor(AvatarRole role, boolean sprint, float speedMultiplier) {
         if (role == AvatarRole.SHRUECK) {
-            return sprint ? GameConstants.SHRUECK_SPRINT_SPEED : GameConstants.SHRUECK_WALK_SPEED;
+            return (sprint ? GameConstants.SHRUECK_SPRINT_SPEED : GameConstants.SHRUECK_WALK_SPEED) * Math.max(0f, speedMultiplier);
         }
-        return sprint ? GameConstants.STUDENT_SPRINT_SPEED : GameConstants.STUDENT_WALK_SPEED;
+        return (sprint ? GameConstants.STUDENT_SPRINT_SPEED : GameConstants.STUDENT_WALK_SPEED) * Math.max(0f, speedMultiplier);
     }
 
     public static CharacterMode idleModeForRole(AvatarRole role) {

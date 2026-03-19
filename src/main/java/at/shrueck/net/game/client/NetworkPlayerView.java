@@ -21,6 +21,7 @@ public final class NetworkPlayerView extends Node {
     private AvatarRole activeRole = AvatarRole.UNASSIGNED;
     private StudentSkin selectedStudentSkin = StudentSkin.FJP;
     private StudentSkin activeStudentSkin = StudentSkin.FJP;
+    private float selectedVisualScale = 1f;
     private float targetYaw;
     private float displayedYaw;
     private boolean initialized;
@@ -42,6 +43,7 @@ public final class NetworkPlayerView extends Node {
 
     public void apply(ClientGameState.ClientPlayerState state) {
         setStudentSkin(state.studentSkin());
+        setVisualScale(state.visualScale());
         ensureActor(state.role());
         targetPosition.set(state.x(), 0f, state.z());
         targetYaw = state.yaw();
@@ -71,6 +73,17 @@ public final class NetworkPlayerView extends Node {
         setCullHint(visible ? CullHint.Inherit : CullHint.Always);
     }
 
+    private void setVisualScale(float visualScale) {
+        float resolvedScale = visualScale <= 0f ? 1f : visualScale;
+        if (Math.abs(selectedVisualScale - resolvedScale) < 0.001f) {
+            return;
+        }
+        selectedVisualScale = resolvedScale;
+        if (actor != null) {
+            actor.setLocalScale(resolvedScale);
+        }
+    }
+
     private void ensureActor(AvatarRole role) {
         AvatarRole resolvedRole = role == null ? AvatarRole.UNASSIGNED : role;
         boolean sameRole = resolvedRole == activeRole;
@@ -90,6 +103,7 @@ public final class NetworkPlayerView extends Node {
             activeStudentSkin = selectedStudentSkin;
         }
         actor.setLocalTranslation(Vector3f.ZERO);
+        actor.setLocalScale(selectedVisualScale);
         attachChild(actor);
         activeRole = resolvedRole;
     }

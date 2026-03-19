@@ -25,6 +25,7 @@ public final class NetworkProtocol {
         Serializer.registerClass(ServerNoticeMessage.class);
         Serializer.registerClass(StateSyncMessage.class);
         Serializer.registerClass(PlayerStateSnapshot.class);
+        Serializer.registerClass(PowerUpSnapshot.class);
 
         registered = true;
     }
@@ -134,6 +135,7 @@ public final class NetworkProtocol {
         public float remainingTimeSeconds;
         public int remainingStudents;
         public PlayerStateSnapshot[] players;
+        public PowerUpSnapshot[] powerUps;
 
         public StateSyncMessage() {
         }
@@ -145,7 +147,8 @@ public final class NetworkProtocol {
                 int winnerCode,
                 float remainingTimeSeconds,
                 int remainingStudents,
-                PlayerStateSnapshot[] players
+                PlayerStateSnapshot[] players,
+                PowerUpSnapshot[] powerUps
         ) {
             this.phaseCode = phaseCode;
             this.hostId = hostId;
@@ -154,6 +157,7 @@ public final class NetworkProtocol {
             this.remainingTimeSeconds = remainingTimeSeconds;
             this.remainingStudents = remainingStudents;
             this.players = players;
+            this.powerUps = powerUps;
         }
     }
 
@@ -170,6 +174,8 @@ public final class NetworkProtocol {
         public float yaw;
         public int modeCode;
         public int skinCode;
+        public float visualScale;
+        public int effectMask;
 
         public PlayerStateSnapshot() {
         }
@@ -184,7 +190,9 @@ public final class NetworkProtocol {
                 float z,
                 float yaw,
                 int modeCode,
-                int skinCode
+                int skinCode,
+                float visualScale,
+                int effectMask
         ) {
             this.playerId = playerId;
             this.playerName = playerName;
@@ -196,6 +204,27 @@ public final class NetworkProtocol {
             this.yaw = yaw;
             this.modeCode = modeCode;
             this.skinCode = skinCode;
+            this.visualScale = visualScale;
+            this.effectMask = effectMask;
+        }
+    }
+
+    @Serializable
+    public static class PowerUpSnapshot {
+
+        public int powerUpId;
+        public int typeCode;
+        public float x;
+        public float z;
+
+        public PowerUpSnapshot() {
+        }
+
+        public PowerUpSnapshot(int powerUpId, int typeCode, float x, float z) {
+            this.powerUpId = powerUpId;
+            this.typeCode = typeCode;
+            this.x = x;
+            this.z = z;
         }
     }
 }

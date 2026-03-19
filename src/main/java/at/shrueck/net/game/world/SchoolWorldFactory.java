@@ -19,6 +19,7 @@ public final class SchoolWorldFactory {
                 new Vector3f(0f, 0f, 25f),
                 createStudentSpawns(),
                 createPatrolPoints(),
+                createPowerUpSpawns(),
                 createLobbySpawns()
         );
     }
@@ -98,6 +99,23 @@ public final class SchoolWorldFactory {
                 new Vector3f(2f, 0f, 21f),
                 new Vector3f(6f, 0f, 21f),
                 new Vector3f(10f, 0f, 21f)
+        );
+    }
+
+    private static List<Vector3f> createPowerUpSpawns() {
+        return List.of(
+                new Vector3f(-24f, 0f, -18f),
+                new Vector3f(-18f, 0f, 0f),
+                new Vector3f(-24f, 0f, 18f),
+                new Vector3f(24f, 0f, -18f),
+                new Vector3f(18f, 0f, 0f),
+                new Vector3f(24f, 0f, 18f),
+                new Vector3f(0f, 0f, -22f),
+                new Vector3f(0f, 0f, 22f),
+                new Vector3f(-6f, 0f, -4f),
+                new Vector3f(6f, 0f, 4f),
+                new Vector3f(-16f, 0f, -20f),
+                new Vector3f(16f, 0f, 20f)
         );
     }
 

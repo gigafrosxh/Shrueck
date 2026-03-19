@@ -15,6 +15,7 @@ import at.shrueck.net.game.shared.AvatarRole;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.MovementMath;
 import at.shrueck.net.game.shared.PlayerInputState;
+import at.shrueck.net.game.shared.PowerUpType;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
 import at.shrueck.net.game.shared.StudentSkin;
@@ -29,6 +30,7 @@ import com.jme3.network.MessageListener;
 import com.jme3.network.Network;
 import com.jme3.network.Server;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +53,8 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
     private final ScheduledExecutorService executor;
 
     private final Map<Integer, ServerPlayer> players = new LinkedHashMap<>();
+    private final Map<Integer, ActivePowerUp> activePowerUps = new LinkedHashMap<>();
+    private final List<PendingPowerUpSpawn> pendingPowerUpSpawns = new ArrayList<>();
 
     private Server server;
     private SessionPhase phase = SessionPhase.LOBBY;
@@ -62,6 +66,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
     private long roundDeadlineNanos;
     private long resultDeadlineNanos;
     private boolean snapshotDirty = true;
+    private int nextPowerUpId;
 
     public LanGameServer(int port) {
         this.port = port;
@@ -130,8 +135,10 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
 
         if (phase == SessionPhase.RUNNING) {
             remainingTimeSeconds = Math.max(0f, (roundDeadlineNanos - now) / 1_000_000_000f);
-            simulatePlayers(tpf);
-            applyCatchLogic();
+            simulatePlayers(tpf, now);
+            applyPowerUpLogic(now);
+            spawnReadyPowerUps(now);
+            applyCatchLogic(now);
             if (phase == SessionPhase.RUNNING && remainingTimeSeconds <= 0f && remainingStudentsCount() > 0) {
                 finishRound(RoundWinner.STUDENTS);
             }
@@ -272,6 +279,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
     }
 
     private void startRound() {
+        resetRoundEffectsAndPowerUps();
         winner = RoundWinner.NONE;
         phase = SessionPhase.RUNNING;
         remainingTimeSeconds = GameConstants.ROUND_DURATION_SECONDS;
@@ -287,6 +295,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         for (ServerPlayer player : sortedPlayers) {
             player.captured = false;
             player.input = PlayerInputState.idle(0f);
+            player.effects.clear();
 
             if (player.playerId == shrueckId) {
                 player.role = AvatarRole.SHRUECK;
@@ -303,6 +312,9 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
             }
         }
 
+        queueInitialPowerUpSpawns(System.nanoTime());
+        spawnReadyPowerUps(System.nanoTime());
+
         snapshotDirty = true;
     }
 
@@ -314,9 +326,12 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         this.winner = Objects.requireNonNull(winner);
         this.phase = SessionPhase.RESULT;
         this.resultDeadlineNanos = System.nanoTime() + (long) (GameConstants.RESULT_DURATION_SECONDS * 1_000_000_000L);
+        activePowerUps.clear();
+        pendingPowerUpSpawns.clear();
 
         for (ServerPlayer player : players.values()) {
             player.input = PlayerInputState.idle(player.input.cameraYaw());
+            player.effects.clear();
             player.mode = MovementMath.resultMode(player.role, winner, player.captured);
         }
 
@@ -328,6 +343,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         winner = RoundWinner.NONE;
         shrueckId = -1;
         remainingTimeSeconds = 0f;
+        resetRoundEffectsAndPowerUps();
         placePlayersInLobby();
         snapshotDirty = true;
     }
@@ -343,6 +359,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
             player.role = AvatarRole.UNASSIGNED;
             player.captured = false;
             player.input = PlayerInputState.idle(0f);
+            player.effects.clear();
             player.mode = CharacterMode.SPECIAL;
         }
     }
@@ -354,7 +371,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 .orElse(-1);
     }
 
-    private void simulatePlayers(float tpf) {
+    private void simulatePlayers(float tpf, long nowNanos) {
         for (ServerPlayer player : players.values()) {
             if (player.role == AvatarRole.UNASSIGNED) {
                 continue;
@@ -363,26 +380,68 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 player.mode = CharacterMode.SPECIAL;
                 continue;
             }
+            if (player.effects.preventsMovement(player.role, nowNanos)) {
+                player.input = PlayerInputState.idle(player.input.cameraYaw());
+                player.mode = player.effects.resolveMode(player.role, CharacterMode.STUNNED, false, nowNanos);
+                continue;
+            }
 
             Vector3f currentPosition = player.position.clone();
-            Vector3f delta = MovementMath.resolveMoveDelta(player.input, player.role, tpf);
+            Vector3f delta = MovementMath.resolveMoveDelta(
+                    player.input,
+                    player.role,
+                    tpf,
+                    player.effects.speedMultiplier(player.role, nowNanos)
+            );
             Vector3f nextPosition = schoolLayout.resolveMovement(currentPosition, delta, GameConstants.PLAYER_RADIUS);
             Vector3f actualMovement = nextPosition.subtract(currentPosition);
             player.position.set(nextPosition);
 
             if (actualMovement.lengthSquared() > 0.0001f) {
                 player.yaw = MovementMath.yawFromDirection(actualMovement, player.yaw);
-                player.mode = MovementMath.moveMode(player.input.sprint());
+                player.mode = player.effects.resolveMode(player.role, MovementMath.moveMode(player.input.sprint()), true, nowNanos);
             } else {
-                player.mode = MovementMath.idleModeForRole(player.role);
+                player.mode = player.effects.resolveMode(player.role, MovementMath.idleModeForRole(player.role), false, nowNanos);
             }
         }
     }
 
-    private void applyCatchLogic() {
+    private void applyPowerUpLogic(long nowNanos) {
+        if (activePowerUps.isEmpty()) {
+            return;
+        }
+
+        ServerPlayer shrueck = players.get(shrueckId);
+        List<Integer> collectedPowerUps = new ArrayList<>();
+
+        for (ActivePowerUp powerUp : activePowerUps.values()) {
+            ServerPlayer collector = findCollector(powerUp);
+            if (collector == null) {
+                continue;
+            }
+
+            collectedPowerUps.add(powerUp.powerUpId);
+            scheduleRespawn(nowNanos + (long) (GameConstants.POWER_UP_RESPAWN_SECONDS * 1_000_000_000L));
+            applyPowerUpEffect(powerUp.type, collector, shrueck, nowNanos);
+        }
+
+        if (collectedPowerUps.isEmpty()) {
+            return;
+        }
+
+        for (Integer powerUpId : collectedPowerUps) {
+            activePowerUps.remove(powerUpId);
+        }
+        snapshotDirty = true;
+    }
+
+    private void applyCatchLogic(long nowNanos) {
         ServerPlayer shrueck = players.get(shrueckId);
         if (shrueck == null) {
             finishRound(RoundWinner.STUDENTS);
+            return;
+        }
+        if (shrueck.effects.preventsMovement(shrueck.role, nowNanos)) {
             return;
         }
 
@@ -406,6 +465,37 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         }
     }
 
+    private void spawnReadyPowerUps(long nowNanos) {
+        if (phase != SessionPhase.RUNNING || pendingPowerUpSpawns.isEmpty()) {
+            return;
+        }
+
+        int index = 0;
+        while (index < pendingPowerUpSpawns.size() && activePowerUps.size() < GameConstants.POWER_UP_MAX_ACTIVE) {
+            PendingPowerUpSpawn pendingSpawn = pendingPowerUpSpawns.get(index);
+            if (pendingSpawn.readyAtNanos > nowNanos) {
+                index++;
+                continue;
+            }
+
+            Vector3f spawnPosition = PowerUpSpawnPlanner.chooseSpawnPoint(
+                    schoolLayout.powerUpSpawns(),
+                    activePowerUpPositions(),
+                    playerPositions(),
+                    random
+            );
+            if (spawnPosition == null) {
+                index++;
+                continue;
+            }
+
+            int powerUpId = ++nextPowerUpId;
+            activePowerUps.put(powerUpId, new ActivePowerUp(powerUpId, PowerUpType.random(random), spawnPosition));
+            pendingPowerUpSpawns.remove(index);
+            snapshotDirty = true;
+        }
+    }
+
     private int remainingStudentsCount() {
         int remainingStudents = 0;
         for (ServerPlayer player : players.values()) {
@@ -420,9 +510,13 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         if (server == null || players.isEmpty()) {
             return;
         }
+        long nowNanos = System.nanoTime();
         PlayerStateSnapshot[] snapshots = sortedPlayers().stream()
-                .map(this::toSnapshot)
+                .map(player -> toSnapshot(player, nowNanos))
                 .toArray(PlayerStateSnapshot[]::new);
+        NetworkProtocol.PowerUpSnapshot[] powerUps = activePowerUps.values().stream()
+                .map(this::toPowerUpSnapshot)
+                .toArray(NetworkProtocol.PowerUpSnapshot[]::new);
         StateSyncMessage snapshot = new StateSyncMessage(
                 phase.code(),
                 hostId,
@@ -430,14 +524,15 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 winner.code(),
                 remainingTimeSeconds,
                 remainingStudentsCount(),
-                snapshots
+                snapshots,
+                powerUps
         );
         for (ServerPlayer player : players.values()) {
             player.connection.send(snapshot);
         }
     }
 
-    private PlayerStateSnapshot toSnapshot(ServerPlayer player) {
+    private PlayerStateSnapshot toSnapshot(ServerPlayer player, long nowNanos) {
         return new PlayerStateSnapshot(
                 player.playerId,
                 player.playerName,
@@ -448,7 +543,18 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
                 player.position.z,
                 player.yaw,
                 player.mode.ordinal(),
-                player.studentSkin.code()
+                player.studentSkin.code(),
+                player.effects.visualScaleMultiplier(player.role, nowNanos),
+                player.effects.effectMask(player.role, nowNanos)
+        );
+    }
+
+    private NetworkProtocol.PowerUpSnapshot toPowerUpSnapshot(ActivePowerUp powerUp) {
+        return new NetworkProtocol.PowerUpSnapshot(
+                powerUp.powerUpId,
+                powerUp.type.code(),
+                powerUp.position.x,
+                powerUp.position.z
         );
     }
 
@@ -460,6 +566,93 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
 
     private void sendNotice(HostedConnection connection, String text) {
         connection.send(new ServerNoticeMessage(text));
+    }
+
+    private void applyPowerUpEffect(PowerUpType type, ServerPlayer collector, ServerPlayer shrueck, long nowNanos) {
+        switch (type) {
+            case STUDENT_SPEED -> {
+                collector.effects.apply(type, nowNanos);
+                sendNotice(collector.connection, type.label() + ": 8s schneller.");
+            }
+            case STUDENT_GROWTH -> {
+                collector.effects.apply(type, nowNanos);
+                sendNotice(collector.connection, type.label() + ": 10s groesser.");
+            }
+            case SHRUECK_SLOW -> {
+                if (shrueck != null) {
+                    shrueck.effects.apply(type, nowNanos);
+                    sendNotice(collector.connection, type.label() + ": Shrueck wird 6s verlangsamt.");
+                    sendNotice(shrueck.connection, "Du wurdest 6s verlangsamt.");
+                }
+            }
+            case SHRUECK_STUN -> {
+                if (shrueck != null) {
+                    shrueck.effects.apply(type, nowNanos);
+                    sendNotice(collector.connection, type.label() + ": Shrueck ist 2.5s gestunnt.");
+                    sendNotice(shrueck.connection, "Du bist kurz gestunnt.");
+                }
+            }
+        }
+    }
+
+    private ServerPlayer findCollector(ActivePowerUp powerUp) {
+        ServerPlayer bestCollector = null;
+        float bestDistanceSquared = Float.MAX_VALUE;
+
+        for (ServerPlayer player : players.values()) {
+            if (player.role != AvatarRole.STUDENT || player.captured) {
+                continue;
+            }
+
+            float distanceSquared = flatDistanceSquared(player.position, powerUp.position);
+            if (distanceSquared > GameConstants.POWER_UP_PICKUP_RADIUS * GameConstants.POWER_UP_PICKUP_RADIUS) {
+                continue;
+            }
+            if (distanceSquared < bestDistanceSquared) {
+                bestDistanceSquared = distanceSquared;
+                bestCollector = player;
+            }
+        }
+
+        return bestCollector;
+    }
+
+    private List<Vector3f> activePowerUpPositions() {
+        List<Vector3f> positions = new ArrayList<>(activePowerUps.size());
+        for (ActivePowerUp powerUp : activePowerUps.values()) {
+            positions.add(powerUp.position);
+        }
+        return positions;
+    }
+
+    private List<Vector3f> playerPositions() {
+        List<Vector3f> positions = new ArrayList<>(players.size());
+        for (ServerPlayer player : players.values()) {
+            if (player.role != AvatarRole.UNASSIGNED && !player.captured) {
+                positions.add(player.position);
+            }
+        }
+        return positions;
+    }
+
+    private void queueInitialPowerUpSpawns(long nowNanos) {
+        pendingPowerUpSpawns.clear();
+        for (int index = 0; index < GameConstants.POWER_UP_MAX_ACTIVE; index++) {
+            pendingPowerUpSpawns.add(new PendingPowerUpSpawn(nowNanos));
+        }
+    }
+
+    private void scheduleRespawn(long readyAtNanos) {
+        pendingPowerUpSpawns.add(new PendingPowerUpSpawn(readyAtNanos));
+    }
+
+    private void resetRoundEffectsAndPowerUps() {
+        activePowerUps.clear();
+        pendingPowerUpSpawns.clear();
+        nextPowerUpId = 0;
+        for (ServerPlayer player : players.values()) {
+            player.effects.clear();
+        }
     }
 
     private void drainCommands() {
@@ -498,6 +691,7 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
         private float yaw;
         private CharacterMode mode = CharacterMode.SPECIAL;
         private PlayerInputState input = PlayerInputState.idle(0f);
+        private final PlayerEffectState effects = new PlayerEffectState();
 
         private ServerPlayer(HostedConnection connection, int playerId, int joinOrder, String playerName) {
             this.connection = connection;
@@ -505,6 +699,12 @@ public final class LanGameServer implements MessageListener<HostedConnection>, C
             this.joinOrder = joinOrder;
             this.playerName = playerName;
         }
+    }
+
+    private record ActivePowerUp(int powerUpId, PowerUpType type, Vector3f position) {
+    }
+
+    private record PendingPowerUpSpawn(long readyAtNanos) {
     }
 
     private static final class ServerThreadFactory implements ThreadFactory {

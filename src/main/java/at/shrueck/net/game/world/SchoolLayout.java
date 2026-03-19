@@ -16,6 +16,7 @@ public final class SchoolLayout {
     private final Vector3f playerSpawn;
     private final List<Vector3f> studentSpawns;
     private final List<Vector3f> patrolPoints;
+    private final List<Vector3f> powerUpSpawns;
     private final List<Vector3f> lobbySpawns;
 
     public SchoolLayout(
@@ -27,6 +28,7 @@ public final class SchoolLayout {
             Vector3f playerSpawn,
             List<Vector3f> studentSpawns,
             List<Vector3f> patrolPoints,
+            List<Vector3f> powerUpSpawns,
             List<Vector3f> lobbySpawns
     ) {
         this.minX = minX;
@@ -37,6 +39,7 @@ public final class SchoolLayout {
         this.playerSpawn = playerSpawn.clone();
         this.studentSpawns = copyPoints(studentSpawns);
         this.patrolPoints = copyPoints(patrolPoints);
+        this.powerUpSpawns = copyPoints(powerUpSpawns);
         this.lobbySpawns = copyPoints(lobbySpawns);
     }
 
@@ -50,6 +53,10 @@ public final class SchoolLayout {
 
     public List<Vector3f> lobbySpawns() {
         return copyPoints(lobbySpawns);
+    }
+
+    public List<Vector3f> powerUpSpawns() {
+        return copyPoints(powerUpSpawns);
     }
 
     public Vector3f randomPatrolPoint(Random random) {

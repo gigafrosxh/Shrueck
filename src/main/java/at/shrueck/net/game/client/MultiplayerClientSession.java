@@ -7,6 +7,7 @@ import at.shrueck.net.game.net.NetworkProtocol.JoinLobbyRequestMessage;
 import at.shrueck.net.game.net.NetworkProtocol.JoinRejectedMessage;
 import at.shrueck.net.game.net.NetworkProtocol.PlayerInputMessage;
 import at.shrueck.net.game.net.NetworkProtocol.PlayerStateSnapshot;
+import at.shrueck.net.game.net.NetworkProtocol.PowerUpSnapshot;
 import at.shrueck.net.game.net.NetworkProtocol.ServerNoticeMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StartRoundRequestMessage;
 import at.shrueck.net.game.net.NetworkProtocol.StateSyncMessage;
@@ -14,6 +15,7 @@ import at.shrueck.net.game.net.NetworkProtocol.UpdateSkinSelectionMessage;
 import at.shrueck.net.game.shared.AvatarRole;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.PlayerInputState;
+import at.shrueck.net.game.shared.PowerUpType;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
 import at.shrueck.net.game.shared.StudentSkin;
@@ -140,6 +142,7 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
 
     private ClientGameState convertState(StateSyncMessage message) {
         List<ClientGameState.ClientPlayerState> players = new ArrayList<>();
+        List<ClientGameState.PowerUpState> powerUps = new ArrayList<>();
         if (message.players != null) {
             for (PlayerStateSnapshot player : message.players) {
                 players.add(new ClientGameState.ClientPlayerState(
@@ -152,7 +155,19 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
                         player.z,
                         player.yaw,
                         decodeMode(player.modeCode),
-                        StudentSkin.fromCode(player.skinCode)
+                        StudentSkin.fromCode(player.skinCode),
+                        player.visualScale,
+                        player.effectMask
+                ));
+            }
+        }
+        if (message.powerUps != null) {
+            for (PowerUpSnapshot powerUp : message.powerUps) {
+                powerUps.add(new ClientGameState.PowerUpState(
+                        powerUp.powerUpId,
+                        PowerUpType.fromCode(powerUp.typeCode),
+                        powerUp.x,
+                        powerUp.z
                 ));
             }
         }
@@ -165,6 +180,7 @@ public final class MultiplayerClientSession implements MessageListener<Client>, 
                 message.remainingTimeSeconds,
                 message.remainingStudents,
                 players,
+                powerUps,
                 null
         );
     }

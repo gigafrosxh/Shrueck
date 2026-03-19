@@ -4,5 +4,7 @@ public enum CharacterMode {
     IDLE,
     MOVE,
     FAST,
-    SPECIAL
+    SPECIAL,
+    DEBUFF,
+    STUNNED
 }

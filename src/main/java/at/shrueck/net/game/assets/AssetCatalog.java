@@ -13,6 +13,8 @@ public final class AssetCatalog {
     private static final float SHRUECK_MOVE_SCALE = 3.08f;
     private static final float SHRUECK_FAST_SCALE = 3.08f;
     private static final float SHRUECK_SPECIAL_SCALE = 2.80f;
+    private static final float SHRUECK_DEBUFF_SCALE = 3.08f;
+    private static final float SHRUECK_STUNNED_SCALE = 2.80f;
     private static final float STUDENT_SCALE = 2.44f;
     private static final String STUDENT_WALKING_CLIP = "Armature|walking_man|baselayer";
     private static final String STUDENT_RUNNING_CLIP = "Armature|running|baselayer";
@@ -59,6 +61,24 @@ public final class AssetCatalog {
                         "assets/shrueck/Meshy_AI_T_Pose_Ogre_biped_Animation_All_Night_Dance_withSkin.glb",
                         "Armature|All_Night_Dance|baselayer",
                         SHRUECK_SPECIAL_SCALE,
+                        0f
+                )
+        );
+        variants.put(
+                CharacterMode.DEBUFF,
+                new AnimationVariant(
+                        "assets/shrueck/Meshy_AI_T_Pose_Ogre_biped_Animation_Slow_Orc_Walk_withSkin.glb",
+                        "Armature|Slow_Orc_Walk|baselayer",
+                        SHRUECK_DEBUFF_SCALE,
+                        0f
+                )
+        );
+        variants.put(
+                CharacterMode.STUNNED,
+                new AnimationVariant(
+                        "assets/shrueck/Meshy_AI_T_Pose_Ogre_biped_Animation_BeHit_FlyUp_withSkin.glb",
+                        "Armature|BeHit_FlyUp|baselayer",
+                        SHRUECK_STUNNED_SCALE,
                         0f
                 )
         );

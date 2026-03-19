@@ -1,7 +1,7 @@
 param(
     [string]$PlatformTag = "windows-x64",
     [string]$PackageType = "exe",
-    [string]$AppVersion = "1.2.0-SNAPSHOT"
+    [string]$AppVersion = "26.1.0"
 )
 
 $ErrorActionPreference = "Stop"

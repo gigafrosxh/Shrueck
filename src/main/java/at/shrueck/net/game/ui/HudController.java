@@ -3,6 +3,7 @@ package at.shrueck.net.game.ui;
 import at.shrueck.net.game.client.ClientGameState;
 import at.shrueck.net.game.client.LaunchConfig;
 import at.shrueck.net.game.shared.AvatarRole;
+import at.shrueck.net.game.shared.PowerUpType;
 import at.shrueck.net.game.shared.RoundWinner;
 import at.shrueck.net.game.shared.SessionPhase;
 import com.jme3.asset.AssetManager;
@@ -101,12 +102,16 @@ public final class HudController {
         if (state.phase() == SessionPhase.RUNNING || state.phase() == SessionPhase.RESULT) {
             builder.append('\n').append("Verbleibende Schueler: ").append(state.remainingStudents());
             builder.append('\n').append("Timer: ").append(formatTime(state.remainingTimeSeconds()));
+            builder.append('\n').append("Power-ups aktiv: ").append(state.powerUps().size());
         } else if (state.phase() == SessionPhase.LOBBY) {
             builder.append('\n').append("Spieler in Lobby: ").append(state.players().size());
         }
 
         if (localPlayer != null && localPlayer.captured()) {
             builder.append('\n').append("Status: Gefangen");
+        }
+        if (localPlayer != null && localPlayer.effectMask() != 0) {
+            builder.append('\n').append("Effekte: ").append(formatEffects(localPlayer.effectMask()));
         }
         if (state.phase() == SessionPhase.DISCONNECTED && state.disconnectReason() != null) {
             builder.append('\n').append(state.disconnectReason());
@@ -173,12 +178,12 @@ public final class HudController {
             return "WASD/Pfeile bewegen | Shift sprintet | " + cameraHint + " | " + skinHint + " | " + mouseHint;
         }
         if (localPlayer.role() == AvatarRole.SHRUECK) {
-            return "WASD/Pfeile bewegen | Shift sprintet | Fange alle Schueler | " + cameraHint + " | " + mouseHint;
+            return "WASD/Pfeile bewegen | Shift sprintet | Fange alle Schueler | Meide Power-ups | " + cameraHint + " | " + mouseHint;
         }
         if (localPlayer.captured()) {
             return "Du wurdest gefangen. Beobachte den Rest der Runde | " + cameraHint + " | " + mouseHint;
         }
-        return "WASD/Pfeile bewegen | Shift sprintet | " + cameraHint + " | " + skinHint + " | Ueberlebe bis der Timer endet | " + mouseHint;
+        return "WASD/Pfeile bewegen | Shift sprintet | Sammle Power-ups | " + cameraHint + " | " + skinHint + " | Ueberlebe bis der Timer endet | " + mouseHint;
     }
 
     private String buildBannerText(ClientGameState state, ClientGameState.ClientPlayerState localPlayer) {
@@ -216,10 +221,11 @@ public final class HudController {
     }
 
     private void refreshLayout() {
+        int statusLines = countLines(statusText.getText());
         statusText.setLocalTranslation(20f, camera.getHeight() - 20f, 0f);
         instructionText.setLocalTranslation(
                 20f,
-                camera.getHeight() - 20f - statusText.getLineHeight() * 5.3f,
+                camera.getHeight() - 20f - statusText.getLineHeight() * (statusLines + 0.9f),
                 0f
         );
         playerListText.setLocalTranslation(
@@ -237,5 +243,32 @@ public final class HudController {
                 camera.getHeight() * 0.14f,
                 0f
         );
+    }
+
+    private String formatEffects(int effectMask) {
+        StringBuilder builder = new StringBuilder();
+        for (PowerUpType type : PowerUpType.values()) {
+            if ((effectMask & type.effectMask()) == 0) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append(", ");
+            }
+            builder.append(type.label());
+        }
+        return builder.isEmpty() ? "-" : builder.toString();
+    }
+
+    private int countLines(String text) {
+        if (text == null || text.isEmpty()) {
+            return 1;
+        }
+        int lines = 1;
+        for (int index = 0; index < text.length(); index++) {
+            if (text.charAt(index) == '\n') {
+                lines++;
+            }
+        }
+        return lines;
     }
 }

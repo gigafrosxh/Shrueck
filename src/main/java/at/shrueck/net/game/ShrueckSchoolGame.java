@@ -5,6 +5,7 @@ import at.shrueck.net.game.client.ClientGameState;
 import at.shrueck.net.game.client.LaunchConfig;
 import at.shrueck.net.game.client.MultiplayerClientSession;
 import at.shrueck.net.game.client.NetworkPlayerView;
+import at.shrueck.net.game.client.PowerUpView;
 import at.shrueck.net.game.server.LanGameServer;
 import at.shrueck.net.game.shared.GameConstants;
 import at.shrueck.net.game.shared.PlayerInputState;
@@ -61,6 +62,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     private final MultiplayerClientSession clientSession;
     private final LanGameServer hostedServer;
     private final Map<Integer, NetworkPlayerView> playerViews = new HashMap<>();
+    private final Map<Integer, PowerUpView> powerUpViews = new HashMap<>();
 
     private SchoolLayout schoolLayout;
     private PlayerController playerController;
@@ -126,6 +128,9 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
         for (NetworkPlayerView playerView : playerViews.values()) {
             playerView.updateVisual(tpf);
+        }
+        for (PowerUpView powerUpView : powerUpViews.values()) {
+            powerUpView.updateVisual(tpf);
         }
 
         sendLocalInput(tpf);
@@ -212,6 +217,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
             }
             view.apply(player);
         }
+        syncPowerUpViews(state);
         syncLocalPlayerPresentation();
 
         Set<Integer> staleIds = new HashSet<>(playerViews.keySet());
@@ -231,6 +237,30 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
         }
         rootNode.attachChild(view);
         syncLocalPlayerPresentation();
+        return view;
+    }
+
+    private void syncPowerUpViews(ClientGameState state) {
+        Set<Integer> activeIds = new HashSet<>();
+        for (ClientGameState.PowerUpState powerUp : state.powerUps()) {
+            activeIds.add(powerUp.powerUpId());
+            PowerUpView view = powerUpViews.computeIfAbsent(powerUp.powerUpId(), id -> createPowerUpView(powerUp));
+            view.apply(powerUp);
+        }
+
+        Set<Integer> staleIds = new HashSet<>(powerUpViews.keySet());
+        staleIds.removeAll(activeIds);
+        for (Integer staleId : staleIds) {
+            PowerUpView staleView = powerUpViews.remove(staleId);
+            if (staleView != null) {
+                staleView.removeFromParent();
+            }
+        }
+    }
+
+    private PowerUpView createPowerUpView(ClientGameState.PowerUpState powerUp) {
+        PowerUpView view = new PowerUpView(assetManager, powerUp.type());
+        rootNode.attachChild(view);
         return view;
     }
 
@@ -389,7 +419,10 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     }
 
     private float cameraTargetHeight() {
-        return cameraPerspective == CameraPerspective.FIRST_PERSON ? FIRST_PERSON_TARGET_HEIGHT : THIRD_PERSON_TARGET_HEIGHT;
+        float baseHeight = cameraPerspective == CameraPerspective.FIRST_PERSON ? FIRST_PERSON_TARGET_HEIGHT : THIRD_PERSON_TARGET_HEIGHT;
+        ClientGameState.ClientPlayerState localPlayer = currentState.findPlayer(clientSession.playerId());
+        float scale = localPlayer == null ? 1f : localPlayer.visualScale();
+        return baseHeight * Math.max(1f, scale);
     }
 
     private void toggleCameraPerspective() {
