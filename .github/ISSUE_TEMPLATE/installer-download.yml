@@ -1,0 +1,30 @@
+name: Installer Download
+description: Request a prebuilt installer package
+title: "[Installer] "
+labels:
+  - installer-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Actions baut den Installer fuer das gewaehlte Zielsystem und postet den Download-Link als Kommentar in dieses Issue.
+
+  - type: dropdown
+    id: target
+    attributes:
+      label: Zielsystem
+      description: Waehle den Installer, den du herunterladen willst.
+      options:
+        - Windows (x64 .exe)
+        - macOS (Apple Silicon .dmg)
+        - Linux (x64 .deb)
+        - Alle haeufigen Installer (Windows, macOS, Linux)
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Hinweise
+      description: Optional. Zusaetzliche Hinweise zum Download oder zum Zielsystem.
+      placeholder: Leer lassen, wenn nicht noetig.

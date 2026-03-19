@@ -1,0 +1,146 @@
+name: Public Installer Request
+
+on:
+  issues:
+    types:
+      - opened
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  prepare:
+    if: contains(join(github.event.issue.labels.*.name, ','), 'installer-request')
+    runs-on: ubuntu-latest
+    outputs:
+      accepted: ${{ steps.parse.outputs.accepted }}
+      target: ${{ steps.parse.outputs.target }}
+      target-label: ${{ steps.parse.outputs.target-label }}
+      response: ${{ steps.parse.outputs.response }}
+    steps:
+      - name: Parse installer request
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const match = body.match(/### Zielsystem\s+([\s\S]*?)(?:\n### |\n## |\n# |$)/i);
+            const selection = match ? match[1].trim().split('\n')[0].trim().toLowerCase() : '';
+
+            const mapping = {
+              'windows (x64 .exe)': {
+                target: 'windows',
+                label: 'Windows x64 (.exe)'
+              },
+              'macos (apple silicon .dmg)': {
+                target: 'macos',
+                label: 'macOS Apple Silicon (.dmg)'
+              },
+              'linux (x64 .deb)': {
+                target: 'linux',
+                label: 'Linux x64 (.deb)'
+              },
+              'alle haeufigen installer (windows, macos, linux)': {
+                target: 'all',
+                label: 'Windows x64, macOS Apple Silicon und Linux x64'
+              }
+            };
+
+            const request = mapping[selection];
+            if (!request) {
+              core.setOutput('accepted', 'false');
+              core.setOutput(
+                'response',
+                'Konnte das Zielsystem aus dem Formular nicht lesen. Bitte die Issue-Vorlage erneut verwenden.'
+              );
+              return;
+            }
+
+            core.setOutput('accepted', 'true');
+            core.setOutput('target', request.target);
+            core.setOutput('target-label', request.label);
+            core.setOutput(
+              'response',
+              `Installer-Build fuer ${request.label} wurde gestartet.`
+            );
+
+      - name: Acknowledge request
+        if: steps.parse.outputs.accepted == 'true'
+        uses: actions/github-script@v7
+        env:
+          TARGET_LABEL: ${{ steps.parse.outputs.target-label }}
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `Installer-Build fuer **${process.env.TARGET_LABEL}** wurde gestartet.`,
+                '',
+                `Workflow-Run: ${runUrl}`,
+                '',
+                'Sobald der Build fertig ist, findest du den Download im Abschnitt **Artifacts** dieses Runs.'
+              ].join('\n')
+            });
+
+      - name: Reject malformed request
+        if: steps.parse.outputs.accepted != 'true'
+        uses: actions/github-script@v7
+        env:
+          RESPONSE: ${{ steps.parse.outputs.response }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: process.env.RESPONSE
+            });
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.accepted == 'true'
+    uses: ./.github/workflows/build-installers.yml
+    with:
+      target: ${{ needs.prepare.outputs.target }}
+      artifact-retention-days: 7
+
+  respond:
+    needs:
+      - prepare
+      - build
+    if: always() && needs.prepare.outputs.accepted == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish result comment
+        uses: actions/github-script@v7
+        env:
+          TARGET_LABEL: ${{ needs.prepare.outputs.target-label }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const success = process.env.BUILD_RESULT === 'success';
+            const body = success
+              ? [
+                  `Installer fuer **${process.env.TARGET_LABEL}** ist fertig.`,
+                  '',
+                  `Download: ${runUrl}`,
+                  '',
+                  'Oeffne im Workflow-Run den Abschnitt **Artifacts** und lade das passende Paket herunter.'
+                ].join('\n')
+              : [
+                  `Installer-Build fuer **${process.env.TARGET_LABEL}** ist fehlgeschlagen.`,
+                  '',
+                  `Details: ${runUrl}`
+                ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

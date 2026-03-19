@@ -9,6 +9,7 @@ import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial.CullHint;
 
 public final class NetworkPlayerView extends Node {
 
@@ -64,6 +65,10 @@ public final class NetworkPlayerView extends Node {
         displayedYaw = interpolateAngle(displayedYaw, targetYaw, factor);
         setLocalTranslation(smoothedPosition);
         setLocalRotation(yawRotation(displayedYaw));
+    }
+
+    public void setVisible(boolean visible) {
+        setCullHint(visible ? CullHint.Inherit : CullHint.Always);
     }
 
     private void ensureActor(AvatarRole role) {

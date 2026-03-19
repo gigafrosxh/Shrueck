@@ -63,7 +63,14 @@ public final class HudController {
         transientNoticeTime = 4f;
     }
 
-    public void render(float tpf, ClientGameState state, int localPlayerId, LaunchConfig launchConfig, boolean mouseCaptured) {
+    public void render(
+            float tpf,
+            ClientGameState state,
+            int localPlayerId,
+            LaunchConfig launchConfig,
+            boolean mouseCaptured,
+            String cameraPerspectiveLabel
+    ) {
         if (transientNoticeTime > 0f) {
             transientNoticeTime = Math.max(0f, transientNoticeTime - tpf);
         }
@@ -75,7 +82,7 @@ public final class HudController {
 
         statusText.setText(buildStatusText(state, localPlayer, launchConfig));
         playerListText.setText(buildPlayerListText(state, localPlayerId));
-        instructionText.setText(buildInstructionText(state, localPlayer, launchConfig.isHost(), mouseCaptured));
+        instructionText.setText(buildInstructionText(state, localPlayer, launchConfig.isHost(), mouseCaptured, cameraPerspectiveLabel));
         bannerText.setText(buildBannerText(state, localPlayer));
         noticeText.setText(transientNotice);
 
@@ -136,18 +143,20 @@ public final class HudController {
             ClientGameState state,
             ClientGameState.ClientPlayerState localPlayer,
             boolean localHostProcess,
-            boolean mouseCaptured
+            boolean mouseCaptured,
+            String cameraPerspectiveLabel
     ) {
         String mouseHint = mouseCaptured ? "Esc loest Maus" : "Linksklick captured Maus";
-        String skinHint = "F6 wechselt Skin";
+        String skinHint = "F6/6 wechselt Skin";
+        String cameraHint = "F3/3 Kamera: " + cameraPerspectiveLabel;
 
         return switch (state.phase()) {
             case CONNECTING -> "Verbinde mit dem Server...";
             case LOBBY -> state.hostId() == (localPlayer == null ? -1 : localPlayer.playerId())
-                    ? "Enter startet die Runde | " + skinHint + " | Maus dreht | " + mouseHint
-                    : "Warte auf den Host | " + skinHint + " | Maus dreht | " + mouseHint;
-            case RUNNING -> buildRunningInstructions(localPlayer, mouseHint, skinHint);
-            case RESULT -> "Naechste Lobby in wenigen Sekunden | " + skinHint + " | Maus dreht | " + mouseHint;
+                    ? "Enter startet die Runde | " + cameraHint + " | " + skinHint + " | Maus dreht | " + mouseHint
+                    : "Warte auf den Host | " + cameraHint + " | " + skinHint + " | Maus dreht | " + mouseHint;
+            case RUNNING -> buildRunningInstructions(localPlayer, mouseHint, skinHint, cameraHint);
+            case RESULT -> "Naechste Lobby in wenigen Sekunden | " + cameraHint + " | " + skinHint + " | Maus dreht | " + mouseHint;
             case DISCONNECTED -> localHostProcess
                     ? "Starte das Spiel neu, um wieder eine Lobby zu hosten."
                     : "Starte den Client neu, um erneut beizutreten.";
@@ -157,18 +166,19 @@ public final class HudController {
     private String buildRunningInstructions(
             ClientGameState.ClientPlayerState localPlayer,
             String mouseHint,
-            String skinHint
+            String skinHint,
+            String cameraHint
     ) {
         if (localPlayer == null) {
-            return "WASD/Pfeile bewegen | Shift sprintet | " + skinHint + " | " + mouseHint;
+            return "WASD/Pfeile bewegen | Shift sprintet | " + cameraHint + " | " + skinHint + " | " + mouseHint;
         }
         if (localPlayer.role() == AvatarRole.SHRUECK) {
-            return "WASD/Pfeile bewegen | Shift sprintet | Fange alle Schueler | " + mouseHint;
+            return "WASD/Pfeile bewegen | Shift sprintet | Fange alle Schueler | " + cameraHint + " | " + mouseHint;
         }
         if (localPlayer.captured()) {
-            return "Du wurdest gefangen. Beobachte den Rest der Runde | " + mouseHint;
+            return "Du wurdest gefangen. Beobachte den Rest der Runde | " + cameraHint + " | " + mouseHint;
         }
-        return "WASD/Pfeile bewegen | Shift sprintet | " + skinHint + " | Ueberlebe bis der Timer endet | " + mouseHint;
+        return "WASD/Pfeile bewegen | Shift sprintet | " + cameraHint + " | " + skinHint + " | Ueberlebe bis der Timer endet | " + mouseHint;
     }
 
     private String buildBannerText(ClientGameState state, ClientGameState.ClientPlayerState localPlayer) {

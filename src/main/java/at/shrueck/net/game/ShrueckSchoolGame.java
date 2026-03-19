@@ -36,18 +36,22 @@ import java.util.Set;
 
 public final class ShrueckSchoolGame extends SimpleApplication implements AnalogListener, ActionListener {
 
-    private static final float CAMERA_DISTANCE = 15.6f;
-    private static final float CAMERA_DEFAULT_PITCH = 30f * FastMath.DEG_TO_RAD;
-    private static final float CAMERA_MIN_PITCH = 16f * FastMath.DEG_TO_RAD;
-    private static final float CAMERA_MAX_PITCH = 55f * FastMath.DEG_TO_RAD;
+    private static final float THIRD_PERSON_CAMERA_DISTANCE = 15.6f;
+    private static final float THIRD_PERSON_DEFAULT_PITCH = 30f * FastMath.DEG_TO_RAD;
+    private static final float THIRD_PERSON_MIN_PITCH = 16f * FastMath.DEG_TO_RAD;
+    private static final float THIRD_PERSON_MAX_PITCH = 55f * FastMath.DEG_TO_RAD;
+    private static final float FIRST_PERSON_MIN_PITCH = -70f * FastMath.DEG_TO_RAD;
+    private static final float FIRST_PERSON_MAX_PITCH = 70f * FastMath.DEG_TO_RAD;
     private static final float CAMERA_SENSITIVITY = 2.6f;
-    private static final float CAMERA_TARGET_HEIGHT = 1.4f;
+    private static final float THIRD_PERSON_TARGET_HEIGHT = 1.4f;
+    private static final float FIRST_PERSON_TARGET_HEIGHT = 1.65f;
     private static final float CAMERA_WALL_MARGIN = 1.1f;
 
     private static final String CAMERA_LOOK_LEFT = "camera.look.left";
     private static final String CAMERA_LOOK_RIGHT = "camera.look.right";
     private static final String CAMERA_LOOK_UP = "camera.look.up";
     private static final String CAMERA_LOOK_DOWN = "camera.look.down";
+    private static final String CAMERA_TOGGLE_PERSPECTIVE = "camera.perspective.toggle";
     private static final String CAMERA_CAPTURE = "camera.capture";
     private static final String CAMERA_RELEASE = "camera.release";
     private static final String LOBBY_START = "lobby.start";
@@ -66,10 +70,11 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     private Vector3f smoothedCameraLocation;
     private boolean mouseCaptured = true;
     private float cameraYaw;
-    private float cameraPitch = CAMERA_DEFAULT_PITCH;
+    private float cameraPitch = THIRD_PERSON_DEFAULT_PITCH;
     private float inputSendAccumulator;
     private PlayerInputState lastSentInput = PlayerInputState.idle(0f);
     private StudentSkin localStudentSkin = StudentSkin.FJP;
+    private CameraPerspective cameraPerspective = CameraPerspective.THIRD_PERSON;
 
     public ShrueckSchoolGame(LaunchConfig launchConfig, MultiplayerClientSession clientSession, LanGameServer hostedServer) {
         this.launchConfig = launchConfig;
@@ -97,7 +102,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
         hudController = new HudController(assetManager, guiNode, cam);
 
         cam.setFrustumPerspective(45f, (float) cam.getWidth() / cam.getHeight(), 0.1f, 200f);
-        smoothedCameraLocation = fallbackCameraTarget().add(cameraOffset());
+        smoothedCameraLocation = fallbackCameraTarget().add(thirdPersonCameraOffset());
         updateCamera(1f, true);
     }
 
@@ -125,7 +130,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
         sendLocalInput(tpf);
         updateCamera(tpf, false);
-        hudController.render(tpf, currentState, clientSession.playerId(), launchConfig, mouseCaptured);
+        hudController.render(tpf, currentState, clientSession.playerId(), launchConfig, mouseCaptured, cameraPerspective.label());
     }
 
     @Override
@@ -149,8 +154,16 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
         switch (name) {
             case CAMERA_LOOK_LEFT -> cameraYaw += value * CAMERA_SENSITIVITY;
             case CAMERA_LOOK_RIGHT -> cameraYaw -= value * CAMERA_SENSITIVITY;
-            case CAMERA_LOOK_UP -> cameraPitch = FastMath.clamp(cameraPitch - value * CAMERA_SENSITIVITY, CAMERA_MIN_PITCH, CAMERA_MAX_PITCH);
-            case CAMERA_LOOK_DOWN -> cameraPitch = FastMath.clamp(cameraPitch + value * CAMERA_SENSITIVITY, CAMERA_MIN_PITCH, CAMERA_MAX_PITCH);
+            case CAMERA_LOOK_UP -> cameraPitch = FastMath.clamp(
+                    cameraPitch - value * CAMERA_SENSITIVITY,
+                    minimumCameraPitch(),
+                    maximumCameraPitch()
+            );
+            case CAMERA_LOOK_DOWN -> cameraPitch = FastMath.clamp(
+                    cameraPitch + value * CAMERA_SENSITIVITY,
+                    minimumCameraPitch(),
+                    maximumCameraPitch()
+            );
             default -> {
             }
         }
@@ -173,6 +186,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
                 }
             }
             case CAMERA_RELEASE -> releaseMouse();
+            case CAMERA_TOGGLE_PERSPECTIVE -> toggleCameraPerspective();
             case LOBBY_START -> {
                 if (currentState.phase() == SessionPhase.LOBBY && currentState.hostId() == clientSession.playerId()) {
                     clientSession.requestRoundStart();
@@ -198,6 +212,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
             }
             view.apply(player);
         }
+        syncLocalPlayerPresentation();
 
         Set<Integer> staleIds = new HashSet<>(playerViews.keySet());
         staleIds.removeAll(activeIds);
@@ -215,6 +230,7 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
             view.setStudentSkin(localStudentSkin);
         }
         rootNode.attachChild(view);
+        syncLocalPlayerPresentation();
         return view;
     }
 
@@ -272,8 +288,19 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
     private void registerGameActions() {
         inputManager.addMapping(LOBBY_START, new KeyTrigger(KeyInput.KEY_RETURN), new KeyTrigger(KeyInput.KEY_NUMPADENTER));
-        inputManager.addMapping(PLAYER_CYCLE_SKIN, new KeyTrigger(KeyInput.KEY_F6));
-        inputManager.addListener(this, LOBBY_START, PLAYER_CYCLE_SKIN);
+        inputManager.addMapping(
+                CAMERA_TOGGLE_PERSPECTIVE,
+                new KeyTrigger(KeyInput.KEY_F3),
+                new KeyTrigger(KeyInput.KEY_3),
+                new KeyTrigger(KeyInput.KEY_NUMPAD3)
+        );
+        inputManager.addMapping(
+                PLAYER_CYCLE_SKIN,
+                new KeyTrigger(KeyInput.KEY_F6),
+                new KeyTrigger(KeyInput.KEY_6),
+                new KeyTrigger(KeyInput.KEY_NUMPAD6)
+        );
+        inputManager.addListener(this, LOBBY_START, CAMERA_TOGGLE_PERSPECTIVE, PLAYER_CYCLE_SKIN);
     }
 
     private void captureMouse() {
@@ -305,7 +332,14 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
 
     private void updateCamera(float tpf, boolean instant) {
         Vector3f target = cameraTarget();
-        Vector3f desiredLocation = schoolLayout.constrainCamera(target, target.add(cameraOffset()), CAMERA_WALL_MARGIN);
+        if (cameraPerspective == CameraPerspective.FIRST_PERSON) {
+            smoothedCameraLocation = target.clone();
+            cam.setLocation(smoothedCameraLocation);
+            cam.lookAtDirection(cameraLookDirection(), Vector3f.UNIT_Y);
+            return;
+        }
+
+        Vector3f desiredLocation = schoolLayout.constrainCamera(target, target.add(thirdPersonCameraOffset()), CAMERA_WALL_MARGIN);
         if (instant || smoothedCameraLocation == null) {
             smoothedCameraLocation = desiredLocation.clone();
         } else {
@@ -319,21 +353,81 @@ public final class ShrueckSchoolGame extends SimpleApplication implements Analog
     private Vector3f cameraTarget() {
         NetworkPlayerView localView = playerViews.get(clientSession.playerId());
         if (localView != null) {
-            return localView.getWorldTranslation().add(0f, CAMERA_TARGET_HEIGHT, 0f);
+            return localView.getWorldTranslation().add(0f, cameraTargetHeight(), 0f);
         }
         return fallbackCameraTarget();
     }
 
     private Vector3f fallbackCameraTarget() {
-        return new Vector3f(0f, CAMERA_TARGET_HEIGHT, 18f);
+        return new Vector3f(0f, cameraTargetHeight(), 18f);
     }
 
-    private Vector3f cameraOffset() {
-        float horizontalDistance = CAMERA_DISTANCE * FastMath.cos(cameraPitch);
+    private Vector3f thirdPersonCameraOffset() {
+        float horizontalDistance = THIRD_PERSON_CAMERA_DISTANCE * FastMath.cos(cameraPitch);
         return new Vector3f(
                 FastMath.sin(cameraYaw) * horizontalDistance,
-                CAMERA_DISTANCE * FastMath.sin(cameraPitch),
+                THIRD_PERSON_CAMERA_DISTANCE * FastMath.sin(cameraPitch),
                 FastMath.cos(cameraYaw) * horizontalDistance
         );
+    }
+
+    private Vector3f cameraLookDirection() {
+        float horizontalStrength = FastMath.cos(cameraPitch);
+        return new Vector3f(
+                FastMath.sin(cameraYaw) * horizontalStrength,
+                FastMath.sin(cameraPitch),
+                FastMath.cos(cameraYaw) * horizontalStrength
+        ).normalizeLocal();
+    }
+
+    private float minimumCameraPitch() {
+        return cameraPerspective == CameraPerspective.FIRST_PERSON ? FIRST_PERSON_MIN_PITCH : THIRD_PERSON_MIN_PITCH;
+    }
+
+    private float maximumCameraPitch() {
+        return cameraPerspective == CameraPerspective.FIRST_PERSON ? FIRST_PERSON_MAX_PITCH : THIRD_PERSON_MAX_PITCH;
+    }
+
+    private float cameraTargetHeight() {
+        return cameraPerspective == CameraPerspective.FIRST_PERSON ? FIRST_PERSON_TARGET_HEIGHT : THIRD_PERSON_TARGET_HEIGHT;
+    }
+
+    private void toggleCameraPerspective() {
+        if (cameraPerspective == CameraPerspective.THIRD_PERSON) {
+            cameraPitch = FastMath.clamp(THIRD_PERSON_DEFAULT_PITCH - cameraPitch, FIRST_PERSON_MIN_PITCH, FIRST_PERSON_MAX_PITCH);
+            cameraPerspective = CameraPerspective.FIRST_PERSON;
+        } else {
+            cameraPitch = FastMath.clamp(THIRD_PERSON_DEFAULT_PITCH - cameraPitch, THIRD_PERSON_MIN_PITCH, THIRD_PERSON_MAX_PITCH);
+            cameraPerspective = CameraPerspective.THIRD_PERSON;
+        }
+        syncLocalPlayerPresentation();
+        if (hudController != null) {
+            hudController.pushNotice("Kamera: " + cameraPerspective.label());
+        }
+        if (cam != null) {
+            updateCamera(1f, true);
+        }
+    }
+
+    private void syncLocalPlayerPresentation() {
+        NetworkPlayerView localView = playerViews.get(clientSession.playerId());
+        if (localView != null) {
+            localView.setVisible(cameraPerspective == CameraPerspective.THIRD_PERSON);
+        }
+    }
+
+    private enum CameraPerspective {
+        THIRD_PERSON("3rd Person"),
+        FIRST_PERSON("1st Person");
+
+        private final String label;
+
+        CameraPerspective(String label) {
+            this.label = label;
+        }
+
+        public String label() {
+            return label;
+        }
     }
 }

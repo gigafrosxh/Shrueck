@@ -1,39 +1,130 @@
 name: Build Installers
 
 on:
+  workflow_call:
+    inputs:
+      target:
+        description: Installer target selection
+        required: false
+        default: all
+        type: string
+      artifact-retention-days:
+        description: Number of days to keep uploaded artifacts
+        required: false
+        default: 14
+        type: number
   workflow_dispatch:
+    inputs:
+      target:
+        description: Which installer(s) should be built
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - windows
+          - windows-x64
+          - windows-arm64
+          - linux
+          - linux-x64
+          - macos
+          - macos-arm64
+          - macos-x64
   push:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      artifact-names: ${{ steps.plan.outputs.artifact-names }}
+      target-label: ${{ steps.plan.outputs.target-label }}
+    steps:
+      - name: Resolve build matrix
+        id: plan
+        uses: actions/github-script@v7
+        env:
+          REQUESTED_TARGET: ${{ github.event_name == 'push' && 'release' || inputs.target || 'all' }}
+        with:
+          script: |
+            const catalog = {
+              'windows-x64': {
+                platform: 'windows-x64',
+                runner: 'windows-2025',
+                javaArch: 'x64',
+                packageType: 'exe',
+                display: 'Windows x64 (.exe)'
+              },
+              'windows-arm64': {
+                platform: 'windows-arm64',
+                runner: 'windows-11-arm',
+                javaArch: 'aarch64',
+                packageType: 'exe',
+                display: 'Windows ARM64 (.exe)'
+              },
+              'linux-x64': {
+                platform: 'linux-x64',
+                runner: 'ubuntu-24.04',
+                javaArch: 'x64',
+                packageType: 'deb',
+                display: 'Linux x64 (.deb)'
+              },
+              'macos-arm64': {
+                platform: 'macos-arm64',
+                runner: 'macos-14',
+                javaArch: 'aarch64',
+                packageType: 'dmg',
+                display: 'macOS Apple Silicon (.dmg)'
+              },
+              'macos-x64': {
+                platform: 'macos-x64',
+                runner: 'macos-15-intel',
+                javaArch: 'x64',
+                packageType: 'dmg',
+                display: 'macOS Intel (.dmg)'
+              }
+            };
+
+            const aliases = {
+              all: ['windows-x64', 'linux-x64', 'macos-arm64'],
+              release: Object.keys(catalog),
+              windows: ['windows-x64'],
+              'windows-x64': ['windows-x64'],
+              'windows-arm64': ['windows-arm64'],
+              linux: ['linux-x64'],
+              'linux-x64': ['linux-x64'],
+              macos: ['macos-arm64'],
+              'macos-arm64': ['macos-arm64'],
+              'macos-x64': ['macos-x64']
+            };
+
+            const requestedTarget = (process.env.REQUESTED_TARGET || 'all').trim().toLowerCase();
+            const selectedTargets = aliases[requestedTarget];
+            if (!selectedTargets) {
+              core.setFailed(
+                `Unknown installer target '${requestedTarget}'. Valid targets: ${Object.keys(aliases).join(', ')}`
+              );
+              return;
+            }
+
+            const include = selectedTargets.map((target) => catalog[target]);
+            core.setOutput('matrix', JSON.stringify({ include }));
+            core.setOutput('artifact-names', selectedTargets.join(', '));
+            core.setOutput('target-label', requestedTarget);
+
   build:
+    needs: prepare
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: windows-x64
-            runner: windows-2025
-            java-arch: x64
-            package-type: exe
-          - platform: windows-arm64
-            runner: windows-11-arm
-            java-arch: aarch64
-            package-type: exe
-          - platform: linux-x64
-            runner: ubuntu-24.04
-            java-arch: x64
-            package-type: deb
-          - platform: macos-arm64
-            runner: macos-14
-            java-arch: aarch64
-            package-type: dmg
-          - platform: macos-x64
-            runner: macos-15-intel
-            java-arch: x64
-            package-type: dmg
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     runs-on: ${{ matrix.runner }}
+    name: Build ${{ matrix.display }}
 
     steps:
       - name: Checkout
@@ -44,7 +135,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          architecture: ${{ matrix.java-arch }}
+          architecture: ${{ matrix.javaArch }}
           cache: maven
 
       - name: Install Linux packaging prerequisites
@@ -60,7 +151,7 @@ jobs:
       - name: Build Windows installer
         if: startsWith(matrix.platform, 'windows')
         shell: pwsh
-        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.package-type }}'
+        run: ./scripts/build-windows-installer.ps1 -PlatformTag '${{ matrix.platform }}' -PackageType '${{ matrix.packageType }}'
 
       - name: Build Linux installer
         if: startsWith(matrix.platform, 'linux')
@@ -76,3 +167,24 @@ jobs:
           name: ${{ matrix.platform }}
           path: dist/${{ matrix.platform }}/*
           if-no-files-found: error
+          retention-days: ${{ inputs.artifact-retention-days || 14 }}
+
+      - name: Add download summary
+        uses: actions/github-script@v7
+        env:
+          MATRIX_DISPLAY: ${{ matrix.display }}
+          MATRIX_PLATFORM: ${{ matrix.platform }}
+        with:
+          script: |
+            const fs = require('fs');
+            fs.appendFileSync(
+              process.env.GITHUB_STEP_SUMMARY,
+              [
+                '## Installer ready',
+                '',
+                `- Target: \`${process.env.MATRIX_DISPLAY}\``,
+                `- Artifact: \`${process.env.MATRIX_PLATFORM}\``,
+                '- Download: open the Artifacts section of this workflow run.',
+                ''
+              ].join('\n')
+            );
