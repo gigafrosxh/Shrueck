@@ -2,7 +2,7 @@
 set -euo pipefail
 
 platform_tag="${1:-macos-arm64}"
-app_version="${APP_VERSION:-26.1.0}"
+app_version="${APP_VERSION:-26.2.0}"
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 local_repo="$project_root/.m2/repository"
 input_dir="$project_root/target/jpackage/input"

@@ -32,6 +32,22 @@ public enum StudentSkin {
             "assets/player/tjr/Meshy_AI_Star_Pose_biped_Animation_Running_withSkin.glb",
             "assets/player/tjr/Meshy_AI_Star_Pose_biped_Animation_Breakdance_1990_withSkin.glb",
             "Armature|Breakdance_1990|baselayer"
+    ),
+    AM(
+            4,
+            "am",
+            "assets/player/am/Meshy_AI_Moxxl_biped_Animation_Walking_withSkin.glb",
+            "assets/player/am/Meshy_AI_Moxxl_biped_Animation_Running_withSkin.glb",
+            "assets/player/am/Meshy_AI_Moxxl_biped_Animation_Hip_Hop_Dance_2_withSkin.glb",
+            "Armature|Hip_Hop_Dance_2|baselayer"
+    ),
+    BIG_D(
+            5,
+            "big_d",
+            "assets/player/big_d/Meshy_AI_Big_D_biped_Animation_Walking_withSkin.glb",
+            "assets/player/big_d/Meshy_AI_Big_D_biped_Animation_Running_withSkin.glb",
+            "assets/player/big_d/Meshy_AI_Big_D_biped_Animation_Dont_You_Dare_withSkin.glb",
+            "Armature|Dont_You_Dare|baselayer"
     );
 
     private final int code;

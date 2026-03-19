@@ -1,7 +1,7 @@
 name: Build Installers
 
 env:
-  APP_VERSION: '26.1.0'
+  APP_VERSION: '26.2.0'
 
 on:
   workflow_call:
